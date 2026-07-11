@@ -33,6 +33,7 @@
     </dependencyManagement>
 
     <modules>
+        <module>common</module>
         <module>eureka-server</module>
     </modules>
 
