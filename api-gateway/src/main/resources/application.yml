@@ -32,3 +32,6 @@ eureka:
       defaultZone: http://localhost:8761/eureka
   instance:
     prefer-ip-address: true
+
+jwt:
+  secret: ${JWT_SECRET:pfz/srQh1hqvsV8yHttL23iKS+WGfhd3cLJ54AvATNs=}

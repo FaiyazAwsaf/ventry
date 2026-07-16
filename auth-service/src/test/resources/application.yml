@@ -1,0 +1,24 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ventry
+    username: ventry
+    password: ventry
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        default_schema: auth
+
+eureka:
+  client:
+    enabled: false
+
+jwt:
+  secret: pfz/srQh1hqvsV8yHttL23iKS+WGfhd3cLJ54AvATNs=
+  expiration-ms: 3600000
