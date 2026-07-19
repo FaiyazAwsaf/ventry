@@ -2,6 +2,8 @@ package com.ventry.event.controller;
 
 import com.ventry.event.dto.CreateEventRequest;
 import com.ventry.event.dto.EventResponse;
+import com.ventry.event.dto.InventoryAdjustmentRequest;
+import com.ventry.event.dto.TierAvailabilityResponse;
 import com.ventry.event.dto.UpdateEventRequest;
 import com.ventry.event.service.EventService;
 import jakarta.validation.Valid;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -52,5 +55,34 @@ public class EventController {
     public ResponseEntity<Void> deleteEvent(@PathVariable String eventId) {
         eventService.deleteEvent(eventId);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{eventId}/tiers/{tierId}/availability")
+    public TierAvailabilityResponse checkAvailability(
+            @PathVariable String eventId,
+            @PathVariable String tierId,
+            @RequestParam int quantity
+    ) {
+        return eventService.checkAvailability(eventId, tierId, quantity);
+    }
+
+    @PostMapping("/{eventId}/tiers/{tierId}/reserve")
+    public ResponseEntity<Void> reserveInventory(
+            @PathVariable String eventId,
+            @PathVariable String tierId,
+            @Valid @RequestBody InventoryAdjustmentRequest request
+    ) {
+        eventService.reserveInventory(eventId, tierId, request.quantity());
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{eventId}/tiers/{tierId}/release")
+    public ResponseEntity<Void> releaseInventory(
+            @PathVariable String eventId,
+            @PathVariable String tierId,
+            @Valid @RequestBody InventoryAdjustmentRequest request
+    ) {
+        eventService.releaseInventory(eventId, tierId, request.quantity());
+        return ResponseEntity.ok().build();
     }
 }

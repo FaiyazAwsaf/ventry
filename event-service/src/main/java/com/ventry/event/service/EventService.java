@@ -3,15 +3,20 @@ package com.ventry.event.service;
 import com.ventry.event.dto.CreateEventRequest;
 import com.ventry.event.dto.CreateTierRequest;
 import com.ventry.event.dto.EventResponse;
+import com.ventry.event.dto.TierAvailabilityResponse;
 import com.ventry.event.dto.TierResponse;
 import com.ventry.event.dto.UpdateEventRequest;
 import com.ventry.event.entity.Event;
 import com.ventry.event.entity.TicketTier;
 import com.ventry.event.exception.EventNotFoundException;
+import com.ventry.event.exception.InsufficientInventoryException;
+import com.ventry.event.exception.TierNotFoundException;
 import com.ventry.event.repository.EventRepository;
+import com.ventry.event.repository.TicketTierRepository;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -19,9 +24,11 @@ import java.util.List;
 public class EventService {
 
     private final EventRepository eventRepository;
+    private final TicketTierRepository ticketTierRepository;
 
-    public EventService(EventRepository eventRepository) {
+    public EventService(EventRepository eventRepository, TicketTierRepository ticketTierRepository) {
         this.eventRepository = eventRepository;
+        this.ticketTierRepository = ticketTierRepository;
     }
 
     @CacheEvict(value = "events", allEntries = true)
@@ -67,6 +74,38 @@ public class EventService {
             throw new EventNotFoundException(eventId);
         }
         eventRepository.deleteById(eventId);
+    }
+
+    public TierAvailabilityResponse checkAvailability(String eventId, String tierId, int quantity) {
+        TicketTier tier = ticketTierRepository.findByIdAndEventId(tierId, eventId)
+                .orElseThrow(() -> new TierNotFoundException(eventId, tierId));
+        return new TierAvailabilityResponse(tier.getAvailable() >= quantity, tier.getAvailable());
+    }
+
+    // Custom @Modifying repository queries, unlike Spring Data's own built-in save()/deleteById(),
+    // aren't auto-wrapped in a transaction - they need one supplied by the caller, hence @Transactional here.
+    @Transactional
+    @CacheEvict(value = "events", allEntries = true)
+    public void reserveInventory(String eventId, String tierId, int quantity) {
+        int updated = ticketTierRepository.reserve(tierId, eventId, quantity);
+        if (updated == 0) {
+            if (!ticketTierRepository.existsByIdAndEventId(tierId, eventId)) {
+                throw new TierNotFoundException(eventId, tierId);
+            }
+            throw new InsufficientInventoryException(eventId, tierId, quantity);
+        }
+    }
+
+    @Transactional
+    @CacheEvict(value = "events", allEntries = true)
+    public void releaseInventory(String eventId, String tierId, int quantity) {
+        int updated = ticketTierRepository.release(tierId, eventId, quantity);
+        // updated == 0 here without a missing tier just means the release would've overshot
+        // capacity - treated as a no-op so a redelivered Kafka compensating-transaction message
+        // doesn't throw, since duplicate release is safe by nature (unlike duplicate reserve).
+        if (updated == 0 && !ticketTierRepository.existsByIdAndEventId(tierId, eventId)) {
+            throw new TierNotFoundException(eventId, tierId);
+        }
     }
 
     private EventResponse toResponse(Event event) {

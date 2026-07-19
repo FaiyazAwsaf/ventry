@@ -3,9 +3,14 @@ package com.ventry.event.service;
 import com.ventry.event.dto.CreateEventRequest;
 import com.ventry.event.dto.CreateTierRequest;
 import com.ventry.event.dto.EventResponse;
+import com.ventry.event.dto.TierAvailabilityResponse;
 import com.ventry.event.entity.Event;
+import com.ventry.event.entity.TicketTier;
 import com.ventry.event.exception.EventNotFoundException;
+import com.ventry.event.exception.InsufficientInventoryException;
+import com.ventry.event.exception.TierNotFoundException;
 import com.ventry.event.repository.EventRepository;
+import com.ventry.event.repository.TicketTierRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -28,6 +33,9 @@ class EventServiceTest {
 
     @Mock
     private EventRepository eventRepository;
+
+    @Mock
+    private TicketTierRepository ticketTierRepository;
 
     @InjectMocks
     private EventService eventService;
@@ -82,5 +90,70 @@ class EventServiceTest {
 
         assertThatThrownBy(() -> eventService.getEvent("missing-id"))
                 .isInstanceOf(EventNotFoundException.class);
+    }
+
+    @Test
+    void checkAvailability_returnsTrueWhenEnoughStock() {
+        TicketTier tier = new TicketTier("Gold", new BigDecimal("100"), 10);
+        when(ticketTierRepository.findByIdAndEventId(tier.getId(), "event-1")).thenReturn(Optional.of(tier));
+
+        TierAvailabilityResponse response = eventService.checkAvailability("event-1", tier.getId(), 5);
+
+        assertThat(response.available()).isTrue();
+        assertThat(response.remaining()).isEqualTo(10);
+    }
+
+    @Test
+    void checkAvailability_throwsWhenTierNotFound() {
+        when(ticketTierRepository.findByIdAndEventId("missing-tier", "event-1")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> eventService.checkAvailability("event-1", "missing-tier", 1))
+                .isInstanceOf(TierNotFoundException.class);
+    }
+
+    @Test
+    void reserveInventory_succeedsWhenRowsUpdated() {
+        when(ticketTierRepository.reserve("tier-1", "event-1", 2)).thenReturn(1);
+
+        eventService.reserveInventory("event-1", "tier-1", 2);
+
+        verify(ticketTierRepository).reserve("tier-1", "event-1", 2);
+    }
+
+    @Test
+    void reserveInventory_throwsInsufficientInventoryWhenTierExistsButUpdateAffectsNoRows() {
+        when(ticketTierRepository.reserve("tier-1", "event-1", 2)).thenReturn(0);
+        when(ticketTierRepository.existsByIdAndEventId("tier-1", "event-1")).thenReturn(true);
+
+        assertThatThrownBy(() -> eventService.reserveInventory("event-1", "tier-1", 2))
+                .isInstanceOf(InsufficientInventoryException.class);
+    }
+
+    @Test
+    void reserveInventory_throwsTierNotFoundWhenTierDoesNotExist() {
+        when(ticketTierRepository.reserve("tier-1", "event-1", 2)).thenReturn(0);
+        when(ticketTierRepository.existsByIdAndEventId("tier-1", "event-1")).thenReturn(false);
+
+        assertThatThrownBy(() -> eventService.reserveInventory("event-1", "tier-1", 2))
+                .isInstanceOf(TierNotFoundException.class);
+    }
+
+    @Test
+    void releaseInventory_isSilentNoOpWhenGuardTripsButTierExists() {
+        when(ticketTierRepository.release("tier-1", "event-1", 2)).thenReturn(0);
+        when(ticketTierRepository.existsByIdAndEventId("tier-1", "event-1")).thenReturn(true);
+
+        eventService.releaseInventory("event-1", "tier-1", 2);
+
+        verify(ticketTierRepository).release("tier-1", "event-1", 2);
+    }
+
+    @Test
+    void releaseInventory_throwsTierNotFoundWhenTierDoesNotExist() {
+        when(ticketTierRepository.release("tier-1", "event-1", 2)).thenReturn(0);
+        when(ticketTierRepository.existsByIdAndEventId("tier-1", "event-1")).thenReturn(false);
+
+        assertThatThrownBy(() -> eventService.releaseInventory("event-1", "tier-1", 2))
+                .isInstanceOf(TierNotFoundException.class);
     }
 }

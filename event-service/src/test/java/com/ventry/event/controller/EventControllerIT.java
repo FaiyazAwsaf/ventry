@@ -101,4 +101,62 @@ class EventControllerIT {
         mockMvc.perform(get("/api/events/{id}", "does-not-exist"))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void tierInventory_reserveThenReleaseReflectsAvailability() throws Exception {
+        String createJson = """
+                {
+                  "name": "Tour Stop",
+                  "description": "desc",
+                  "eventDate": "2027-03-01T20:00:00",
+                  "venue": "Venue",
+                  "bannerUrl": null,
+                  "tiers": [
+                    {"name": "Silver", "price": 1000, "capacity": 5}
+                  ]
+                }
+                """;
+
+        String createResponse = mockMvc.perform(post("/api/events")
+                        .contentType("application/json")
+                        .content(createJson))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        String eventId = JsonPath.read(createResponse, "$.id");
+        String tierId = JsonPath.read(createResponse, "$.tiers[0].id");
+
+        mockMvc.perform(get("/api/events/{eventId}/tiers/{tierId}/availability", eventId, tierId)
+                        .param("quantity", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(true))
+                .andExpect(jsonPath("$.remaining").value(5));
+
+        mockMvc.perform(post("/api/events/{eventId}/tiers/{tierId}/reserve", eventId, tierId)
+                        .contentType("application/json")
+                        .content("{\"quantity\": 5}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/events/{eventId}/tiers/{tierId}/reserve", eventId, tierId)
+                        .contentType("application/json")
+                        .content("{\"quantity\": 1}"))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(post("/api/events/{eventId}/tiers/{tierId}/release", eventId, tierId)
+                        .contentType("application/json")
+                        .content("{\"quantity\": 2}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/events/{eventId}/tiers/{tierId}/availability", eventId, tierId)
+                        .param("quantity", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.remaining").value(2));
+    }
+
+    @Test
+    void tierAvailability_returnsNotFoundForUnknownTier() throws Exception {
+        mockMvc.perform(get("/api/events/{eventId}/tiers/{tierId}/availability", "no-event", "no-tier")
+                        .param("quantity", "1"))
+                .andExpect(status().isNotFound());
+    }
 }
