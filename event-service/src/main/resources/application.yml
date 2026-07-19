@@ -1,0 +1,29 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: event-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ventry
+    username: ventry
+    password: ventry
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        default_schema: event
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  cache:
+    type: redis
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+  instance:
+    prefer-ip-address: true
