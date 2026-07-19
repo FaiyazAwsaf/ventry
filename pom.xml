@@ -71,6 +71,20 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- Without -parameters, Spring can't resolve @PathVariable/@RequestParam names via
+                 reflection at runtime unless every one is given an explicit name. Spring Boot's
+                 own starter-parent enables this by default; our custom parent doesn't, so it's
+                 pinned here once for every module. Declared directly under <plugins> (not
+                 pluginManagement) so it actually binds for every child without each one having
+                 to redeclare it. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <parameters>true</parameters>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>

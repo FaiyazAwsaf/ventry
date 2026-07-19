@@ -4,6 +4,7 @@ import com.ventry.event.dto.CreateEventRequest;
 import com.ventry.event.dto.CreateTierRequest;
 import com.ventry.event.dto.EventResponse;
 import com.ventry.event.dto.TierResponse;
+import com.ventry.event.dto.UpdateEventRequest;
 import com.ventry.event.entity.Event;
 import com.ventry.event.entity.TicketTier;
 import com.ventry.event.exception.EventNotFoundException;
@@ -45,6 +46,21 @@ public class EventService {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new EventNotFoundException(eventId));
         return toResponse(event);
+    }
+
+    public EventResponse updateEvent(String eventId, UpdateEventRequest request) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new EventNotFoundException(eventId));
+        event.update(request.name(), request.description(), request.eventDate(), request.venue(), request.bannerUrl());
+        eventRepository.save(event);
+        return toResponse(event);
+    }
+
+    public void deleteEvent(String eventId) {
+        if (!eventRepository.existsById(eventId)) {
+            throw new EventNotFoundException(eventId);
+        }
+        eventRepository.deleteById(eventId);
     }
 
     private EventResponse toResponse(Event event) {

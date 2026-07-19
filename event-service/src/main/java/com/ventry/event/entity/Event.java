@@ -52,6 +52,14 @@ public class Event {
         tier.setEvent(this);
     }
 
+    public void update(String name, String description, LocalDateTime eventDate, String venue, String bannerUrl) {
+        this.name = name;
+        this.description = description;
+        this.eventDate = eventDate;
+        this.venue = venue;
+        this.bannerUrl = bannerUrl;
+    }
+
     public String getId() {
         return id;
     }
