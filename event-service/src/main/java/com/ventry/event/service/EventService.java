@@ -9,6 +9,8 @@ import com.ventry.event.entity.Event;
 import com.ventry.event.entity.TicketTier;
 import com.ventry.event.exception.EventNotFoundException;
 import com.ventry.event.repository.EventRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -22,6 +24,7 @@ public class EventService {
         this.eventRepository = eventRepository;
     }
 
+    @CacheEvict(value = "events", allEntries = true)
     public EventResponse createEvent(CreateEventRequest request) {
         Event event = new Event(
                 request.name(),
@@ -38,6 +41,7 @@ public class EventService {
         return toResponse(event);
     }
 
+    @Cacheable("events")
     public List<EventResponse> browseEvents() {
         return eventRepository.findAll().stream().map(this::toResponse).toList();
     }
@@ -48,6 +52,7 @@ public class EventService {
         return toResponse(event);
     }
 
+    @CacheEvict(value = "events", allEntries = true)
     public EventResponse updateEvent(String eventId, UpdateEventRequest request) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new EventNotFoundException(eventId));
@@ -56,6 +61,7 @@ public class EventService {
         return toResponse(event);
     }
 
+    @CacheEvict(value = "events", allEntries = true)
     public void deleteEvent(String eventId) {
         if (!eventRepository.existsById(eventId)) {
             throw new EventNotFoundException(eventId);
