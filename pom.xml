@@ -38,6 +38,7 @@
         <module>api-gateway</module>
         <module>auth-service</module>
         <module>event-service</module>
+        <module>booking-service</module>
     </modules>
 
     <build>
