@@ -5,7 +5,9 @@ import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
@@ -37,6 +39,7 @@ class JwtAuthenticationFilterTest {
         Date now = new Date();
         return Jwts.builder()
                 .subject("demo@ventry.com")
+                .claim("userId", "1")
                 .claim("role", "CUSTOMER")
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + 3600_000))
@@ -51,7 +54,7 @@ class JwtAuthenticationFilterTest {
 
         filter.filter(exchange, chain).block();
 
-        verify(chain).filter(exchange);
+        verify(chain).filter(any());
         assertThat(exchange.getResponse().getStatusCode()).isNull();
     }
 
@@ -86,7 +89,55 @@ class JwtAuthenticationFilterTest {
 
         filter.filter(exchange, chain).block();
 
-        verify(chain).filter(exchange);
+        verify(chain).filter(any());
         assertThat(exchange.getResponse().getStatusCode()).isNull();
+    }
+
+    @Test
+    void forwardsVerifiedIdentityAsHeadersDownstream() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/events")
+                        .header("Authorization", "Bearer " + validToken()));
+
+        filter.filter(exchange, chain).block();
+
+        ArgumentCaptor<ServerWebExchange> captor = ArgumentCaptor.forClass(ServerWebExchange.class);
+        verify(chain).filter(captor.capture());
+        HttpHeaders forwarded = captor.getValue().getRequest().getHeaders();
+        assertThat(forwarded.getFirst("X-User-Id")).isEqualTo("1");
+        assertThat(forwarded.getFirst("X-User-Role")).isEqualTo("CUSTOMER");
+    }
+
+    @Test
+    void overwritesClientSuppliedIdentityHeadersWithVerifiedValues() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/events")
+                        .header("Authorization", "Bearer " + validToken())
+                        .header("X-User-Id", "spoofed-id")
+                        .header("X-User-Role", "ADMIN"));
+
+        filter.filter(exchange, chain).block();
+
+        ArgumentCaptor<ServerWebExchange> captor = ArgumentCaptor.forClass(ServerWebExchange.class);
+        verify(chain).filter(captor.capture());
+        HttpHeaders forwarded = captor.getValue().getRequest().getHeaders();
+        assertThat(forwarded.get("X-User-Id")).containsExactly("1");
+        assertThat(forwarded.get("X-User-Role")).containsExactly("CUSTOMER");
+    }
+
+    @Test
+    void stripsClientSuppliedIdentityHeadersOnPublicAuthPath() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/auth/login")
+                        .header("X-User-Id", "spoofed-id")
+                        .header("X-User-Role", "ADMIN"));
+
+        filter.filter(exchange, chain).block();
+
+        ArgumentCaptor<ServerWebExchange> captor = ArgumentCaptor.forClass(ServerWebExchange.class);
+        verify(chain).filter(captor.capture());
+        HttpHeaders forwarded = captor.getValue().getRequest().getHeaders();
+        assertThat(forwarded.get("X-User-Id")).isNull();
+        assertThat(forwarded.get("X-User-Role")).isNull();
     }
 }

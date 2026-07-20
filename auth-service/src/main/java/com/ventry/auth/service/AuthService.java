@@ -34,9 +34,9 @@ public class AuthService {
                 passwordEncoder.encode(request.password()),
                 User.Role.CUSTOMER
         );
-        userRepository.save(user);
+        user = userRepository.save(user);
 
-        String token = jwtService.issueToken(user.getEmail(), user.getRole().name());
+        String token = jwtService.issueToken(user.getId().toString(), user.getEmail(), user.getRole().name());
         return new AuthResponse(token, user.getEmail(), user.getRole().name());
     }
 
@@ -48,7 +48,7 @@ public class AuthService {
             throw new InvalidCredentialsException();
         }
 
-        String token = jwtService.issueToken(user.getEmail(), user.getRole().name());
+        String token = jwtService.issueToken(user.getId().toString(), user.getEmail(), user.getRole().name());
         return new AuthResponse(token, user.getEmail(), user.getRole().name());
     }
 }

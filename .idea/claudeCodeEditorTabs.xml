@@ -1,23 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ClaudeCodeEditorTabs">
-    <option name="activeSessionId" value="c0d5e1e4-b3ee-44c4-bb2e-a19753171717" />
+    <option name="activeSessionId" value="7d111ca2-de74-40c0-a9c1-c39f41c471cc" />
     <option name="openSessionIds">
       <list>
         <option value="c9ed3026-b698-40cc-a4b8-b17f53aa1f4b" />
         <option value="c0d5e1e4-b3ee-44c4-bb2e-a19753171717" />
+        <option value="7d111ca2-de74-40c0-a9c1-c39f41c471cc" />
       </list>
     </option>
     <option name="sessionPaths">
       <map>
+        <entry key="7d111ca2-de74-40c0-a9c1-c39f41c471cc" value="/sessions/ff5a7c3c-6bc3-4eef-91fe-b9432f135111" />
         <entry key="c0d5e1e4-b3ee-44c4-bb2e-a19753171717" value="/sessions/3104c92c-e437-4eaa-80b1-71a3b6940d64" />
         <entry key="c9ed3026-b698-40cc-a4b8-b17f53aa1f4b" value="/sessions/2e2be154-40cf-424e-ad40-cf50a75648ec" />
       </map>
     </option>
     <option name="sessionTitles">
       <map>
-        <entry key="c0d5e1e4-b3ee-44c4-bb2e-a19753171717" value="Read the following files completely before doing a" />
-        <entry key="c9ed3026-b698-40cc-a4b8-b17f53aa1f4b" value="phase 2 and 3" />
+        <entry key="7d111ca2-de74-40c0-a9c1-c39f41c471cc" value="Read the following files completely before doing a" />
+        <entry key="c0d5e1e4-b3ee-44c4-bb2e-a19753171717" value="Event Service" />
+        <entry key="c9ed3026-b698-40cc-a4b8-b17f53aa1f4b" value="phase 2 and 3(Auth Service)" />
       </map>
     </option>
   </component>

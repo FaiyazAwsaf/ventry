@@ -14,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
@@ -43,7 +44,12 @@ class AuthServiceTest {
         RegisterRequest request = new RegisterRequest("new@ventry.com", "password123");
         when(userRepository.existsByEmail("new@ventry.com")).thenReturn(false);
         when(passwordEncoder.encode("password123")).thenReturn("hashed");
-        when(jwtService.issueToken("new@ventry.com", "CUSTOMER")).thenReturn("signed-token");
+        when(userRepository.save(any())).thenAnswer(invocation -> {
+            User saved = invocation.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", 1L);
+            return saved;
+        });
+        when(jwtService.issueToken("1", "new@ventry.com", "CUSTOMER")).thenReturn("signed-token");
 
         AuthResponse response = authService.register(request);
 
@@ -71,9 +77,10 @@ class AuthServiceTest {
     @Test
     void login_returnsTokenForValidCredentials() {
         User user = new User("existing@ventry.com", "hashed", User.Role.CUSTOMER);
+        ReflectionTestUtils.setField(user, "id", 42L);
         when(userRepository.findByEmail("existing@ventry.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("password123", "hashed")).thenReturn(true);
-        when(jwtService.issueToken("existing@ventry.com", "CUSTOMER")).thenReturn("signed-token");
+        when(jwtService.issueToken("42", "existing@ventry.com", "CUSTOMER")).thenReturn("signed-token");
 
         AuthResponse response = authService.login(new LoginRequest("existing@ventry.com", "password123"));
 
