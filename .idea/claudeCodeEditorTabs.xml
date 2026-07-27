@@ -1,16 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ClaudeCodeEditorTabs">
-    <option name="activeSessionId" value="7d111ca2-de74-40c0-a9c1-c39f41c471cc" />
+    <option name="activeSessionId" value="5992654d-5fc5-43d5-97bd-6b9244c1bda6" />
     <option name="openSessionIds">
       <list>
         <option value="c9ed3026-b698-40cc-a4b8-b17f53aa1f4b" />
         <option value="c0d5e1e4-b3ee-44c4-bb2e-a19753171717" />
         <option value="7d111ca2-de74-40c0-a9c1-c39f41c471cc" />
+        <option value="5992654d-5fc5-43d5-97bd-6b9244c1bda6" />
       </list>
     </option>
     <option name="sessionPaths">
       <map>
+        <entry key="5992654d-5fc5-43d5-97bd-6b9244c1bda6" value="/sessions/e4e45ee0-a59f-46d8-a0b0-dac757c26cb7" />
         <entry key="7d111ca2-de74-40c0-a9c1-c39f41c471cc" value="/sessions/ff5a7c3c-6bc3-4eef-91fe-b9432f135111" />
         <entry key="c0d5e1e4-b3ee-44c4-bb2e-a19753171717" value="/sessions/3104c92c-e437-4eaa-80b1-71a3b6940d64" />
         <entry key="c9ed3026-b698-40cc-a4b8-b17f53aa1f4b" value="/sessions/663864ae-14fd-4c05-82ae-a21068ef6c65" />
@@ -18,8 +20,9 @@
     </option>
     <option name="sessionTitles">
       <map>
-        <entry key="7d111ca2-de74-40c0-a9c1-c39f41c471cc" value="Read the following files completely before doing a" />
-        <entry key="c0d5e1e4-b3ee-44c4-bb2e-a19753171717" value="Event Service" />
+        <entry key="5992654d-5fc5-43d5-97bd-6b9244c1bda6" value="Read the following files completely before doing a" />
+        <entry key="7d111ca2-de74-40c0-a9c1-c39f41c471cc" value="Phase 3 (Booking service - write side)" />
+        <entry key="c0d5e1e4-b3ee-44c4-bb2e-a19753171717" value="Phase 3 - Event Service" />
         <entry key="c9ed3026-b698-40cc-a4b8-b17f53aa1f4b" value="Learning" />
       </map>
     </option>
