@@ -32,3 +32,9 @@ eureka:
       defaultZone: http://localhost:8761/eureka
   instance:
     prefer-ip-address: true
+
+payment:
+  # Mock gateway decline threshold (BDT) - amounts above this simulate a real
+  # gateway's per-transaction limit, giving a deterministic, reproducible way to
+  # trigger the payment.failed / compensating-transaction path.
+  decline-threshold: 100000
