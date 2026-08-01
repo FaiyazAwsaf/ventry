@@ -1,5 +1,6 @@
 package com.ventry.booking.kafka;
 
+import com.ventry.common.events.BookingConfirmedEvent;
 import com.ventry.common.events.BookingInitiatedEvent;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Component;
 public class BookingEventProducer {
 
     private static final String BOOKING_INITIATED_TOPIC = "booking.initiated";
+    private static final String BOOKING_CONFIRMED_TOPIC = "booking.confirmed";
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
@@ -21,5 +23,13 @@ public class BookingEventProducer {
      */
     public void publishBookingInitiated(BookingInitiatedEvent event) {
         kafkaTemplate.send(BOOKING_INITIATED_TOPIC, event.bookingId(), event);
+    }
+
+    /**
+     * Consumed next by QR/Ticket Service and Notification Service (Day 9-10) - keyed by
+     * bookingId for the same ordering reason as publishBookingInitiated.
+     */
+    public void publishBookingConfirmed(BookingConfirmedEvent event) {
+        kafkaTemplate.send(BOOKING_CONFIRMED_TOPIC, event.bookingId(), event);
     }
 }
