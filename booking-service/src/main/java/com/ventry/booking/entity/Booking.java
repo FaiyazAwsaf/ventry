@@ -78,4 +78,31 @@ public class Booking {
     public Status getStatus() {
         return status;
     }
+
+    /**
+     * Idempotent - Kafka's at-least-once delivery (architecture.md's consistency NFR)
+     * means payment.success can be redelivered for a booking already CONFIRMED/FAILED.
+     * Returns false on a redelivery so the caller knows not to re-append an event-store
+     * row or re-publish booking.confirmed.
+     */
+    public boolean confirm() {
+        if (status != Status.PENDING) {
+            return false;
+        }
+        status = Status.CONFIRMED;
+        return true;
+    }
+
+    /**
+     * Same idempotency guard as confirm() - also stops the compensating-transaction
+     * inventory release (a REST call, not just a DB write) from firing twice on a
+     * redelivered payment.failed.
+     */
+    public boolean markFailed() {
+        if (status != Status.PENDING) {
+            return false;
+        }
+        status = Status.FAILED;
+        return true;
+    }
 }

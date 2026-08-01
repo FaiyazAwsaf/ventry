@@ -62,4 +62,22 @@ public class EventServiceClient {
             throw new TierUnavailableException(eventId, tierId, quantity);
         }
     }
+
+    /**
+     * The compensating transaction for a failed payment. No Conflict branch here unlike
+     * reserveInventory - Event Service's release endpoint treats a capacity-guard trip as
+     * a safe no-op (never a 409), specifically so a redelivered payment.failed message
+     * can call this again without erroring.
+     */
+    public void releaseInventory(String eventId, String tierId, int quantity) {
+        try {
+            restClient.post()
+                    .uri("/api/events/{eventId}/tiers/{tierId}/release", eventId, tierId)
+                    .body(new InventoryAdjustmentRequest(quantity))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (HttpClientErrorException.NotFound e) {
+            throw new EventOrTierNotFoundException(eventId, tierId);
+        }
+    }
 }
