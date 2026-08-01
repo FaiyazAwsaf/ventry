@@ -4,10 +4,15 @@ import com.ventry.booking.client.EventServiceClient;
 import com.ventry.booking.dto.BookingResponse;
 import com.ventry.booking.dto.CreateBookingRequest;
 import com.ventry.booking.entity.Booking;
+import com.ventry.booking.exception.BookingNotFoundException;
 import com.ventry.booking.exception.EventOrTierNotFoundException;
 import com.ventry.booking.exception.TierUnavailableException;
 import com.ventry.booking.kafka.BookingEventProducer;
+import com.ventry.booking.repository.BookingRepository;
+import com.ventry.common.events.BookingConfirmedEvent;
 import com.ventry.common.events.BookingInitiatedEvent;
+import com.ventry.common.events.PaymentFailedEvent;
+import com.ventry.common.events.PaymentSuccessEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -16,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -32,6 +38,9 @@ class BookingServiceTest {
 
     @Mock
     private EventServiceClient eventServiceClient;
+
+    @Mock
+    private BookingRepository bookingRepository;
 
     @Mock
     private BookingEventStore bookingEventStore;
@@ -95,5 +104,72 @@ class BookingServiceTest {
 
         verify(bookingEventStore, never()).append(any(), any(), any());
         verify(bookingEventProducer, never()).publishBookingInitiated(any());
+    }
+
+    @Test
+    void confirmBooking_transitionsPendingBookingAndPublishesBookingConfirmed() {
+        Booking booking = new Booking("customer-1", "event-1", "tier-1", 2, BigDecimal.valueOf(1000));
+        String bookingId = booking.getBookingId();
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+
+        bookingService.confirmBooking(new PaymentSuccessEvent(bookingId, BigDecimal.valueOf(1000)));
+
+        assertThat(booking.getStatus()).isEqualTo(Booking.Status.CONFIRMED);
+
+        ArgumentCaptor<BookingConfirmedEvent> captor = ArgumentCaptor.forClass(BookingConfirmedEvent.class);
+        verify(bookingEventStore).append(eq(booking), eq("BOOKING_CONFIRMED"), captor.capture());
+        assertThat(captor.getValue().bookingId()).isEqualTo(bookingId);
+        assertThat(captor.getValue().totalAmount()).isEqualByComparingTo(BigDecimal.valueOf(1000));
+
+        verify(bookingEventProducer).publishBookingConfirmed(captor.getValue());
+    }
+
+    @Test
+    void confirmBooking_redeliveredEventOnAlreadyConfirmedBookingIsNoOp() {
+        Booking booking = new Booking("customer-1", "event-1", "tier-1", 2, BigDecimal.valueOf(1000));
+        booking.confirm();
+        String bookingId = booking.getBookingId();
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+
+        bookingService.confirmBooking(new PaymentSuccessEvent(bookingId, BigDecimal.valueOf(1000)));
+
+        verify(bookingEventStore, never()).append(any(), any(), any());
+        verify(bookingEventProducer, never()).publishBookingConfirmed(any());
+    }
+
+    @Test
+    void confirmBooking_throwsWhenBookingUnknown() {
+        when(bookingRepository.findById("missing-booking")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                bookingService.confirmBooking(new PaymentSuccessEvent("missing-booking", BigDecimal.TEN)))
+                .isInstanceOf(BookingNotFoundException.class);
+    }
+
+    @Test
+    void failBooking_transitionsPendingBookingAndReleasesInventory() {
+        Booking booking = new Booking("customer-1", "event-1", "tier-1", 3, BigDecimal.valueOf(1500));
+        String bookingId = booking.getBookingId();
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+
+        PaymentFailedEvent event = new PaymentFailedEvent(bookingId, "Payment declined by BKASH");
+        bookingService.failBooking(event);
+
+        assertThat(booking.getStatus()).isEqualTo(Booking.Status.FAILED);
+        verify(bookingEventStore).append(booking, "BOOKING_FAILED", event);
+        verify(eventServiceClient).releaseInventory("event-1", "tier-1", 3);
+    }
+
+    @Test
+    void failBooking_redeliveredEventOnAlreadyFailedBookingIsNoOp() {
+        Booking booking = new Booking("customer-1", "event-1", "tier-1", 3, BigDecimal.valueOf(1500));
+        booking.markFailed();
+        String bookingId = booking.getBookingId();
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+
+        bookingService.failBooking(new PaymentFailedEvent(bookingId, "Payment declined by BKASH"));
+
+        verify(bookingEventStore, never()).append(any(), any(), any());
+        verify(eventServiceClient, never()).releaseInventory(any(), any(), anyInt());
     }
 }
