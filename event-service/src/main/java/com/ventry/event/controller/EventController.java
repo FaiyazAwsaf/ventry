@@ -5,6 +5,7 @@ import com.ventry.event.dto.EventResponse;
 import com.ventry.event.dto.InventoryAdjustmentRequest;
 import com.ventry.event.dto.TierAvailabilityResponse;
 import com.ventry.event.dto.UpdateEventRequest;
+import com.ventry.event.exception.ForbiddenException;
 import com.ventry.event.service.EventService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,17 +44,36 @@ public class EventController {
     }
 
     @PostMapping
-    public ResponseEntity<EventResponse> createEvent(@Valid @RequestBody CreateEventRequest request) {
+    public ResponseEntity<EventResponse> createEvent(
+            @RequestHeader("X-User-Role") String role,
+            @Valid @RequestBody CreateEventRequest request
+    ) {
+        if (!"ADMIN".equals(role)) {
+            throw new ForbiddenException(role);
+        }
         return ResponseEntity.status(HttpStatus.CREATED).body(eventService.createEvent(request));
     }
 
     @PutMapping("/{eventId}")
-    public EventResponse updateEvent(@PathVariable String eventId, @Valid @RequestBody UpdateEventRequest request) {
+    public EventResponse updateEvent(
+            @RequestHeader("X-User-Role") String role,
+            @PathVariable String eventId,
+            @Valid @RequestBody UpdateEventRequest request
+    ) {
+        if (!"ADMIN".equals(role)) {
+            throw new ForbiddenException(role);
+        }
         return eventService.updateEvent(eventId, request);
     }
 
     @DeleteMapping("/{eventId}")
-    public ResponseEntity<Void> deleteEvent(@PathVariable String eventId) {
+    public ResponseEntity<Void> deleteEvent(
+            @RequestHeader("X-User-Role") String role,
+            @PathVariable String eventId
+    ) {
+        if (!"ADMIN".equals(role)) {
+            throw new ForbiddenException(role);
+        }
         eventService.deleteEvent(eventId);
         return ResponseEntity.noContent().build();
     }
