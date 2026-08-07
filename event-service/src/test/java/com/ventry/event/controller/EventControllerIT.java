@@ -39,6 +39,7 @@ class EventControllerIT {
                 """;
 
         String createResponse = mockMvc.perform(post("/api/events")
+                        .header("X-User-Role", "ADMIN")
                         .contentType("application/json")
                         .content(createJson))
                 .andExpect(status().isCreated())
@@ -67,12 +68,14 @@ class EventControllerIT {
                 """;
 
         mockMvc.perform(put("/api/events/{id}", eventId)
+                        .header("X-User-Role", "ADMIN")
                         .contentType("application/json")
                         .content(updateJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Coldplay Live - Rescheduled"));
 
-        mockMvc.perform(delete("/api/events/{id}", eventId))
+        mockMvc.perform(delete("/api/events/{id}", eventId)
+                        .header("X-User-Role", "ADMIN"))
                 .andExpect(status().isNoContent());
 
         mockMvc.perform(get("/api/events/{id}", eventId))
@@ -91,6 +94,7 @@ class EventControllerIT {
                 """;
 
         mockMvc.perform(post("/api/events")
+                        .header("X-User-Role", "ADMIN")
                         .contentType("application/json")
                         .content(invalidJson))
                 .andExpect(status().isBadRequest());
@@ -118,6 +122,7 @@ class EventControllerIT {
                 """;
 
         String createResponse = mockMvc.perform(post("/api/events")
+                        .header("X-User-Role", "ADMIN")
                         .contentType("application/json")
                         .content(createJson))
                 .andExpect(status().isCreated())
@@ -158,5 +163,97 @@ class EventControllerIT {
         mockMvc.perform(get("/api/events/{eventId}/tiers/{tierId}/availability", "no-event", "no-tier")
                         .param("quantity", "1"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void createEvent_rejectsNonAdminRoleWith403() throws Exception {
+        String createJson = """
+                {
+                  "name": "Coldplay Live",
+                  "description": "World tour stop",
+                  "eventDate": "2027-01-01T20:00:00",
+                  "venue": "Army Stadium",
+                  "bannerUrl": null,
+                  "tiers": [
+                    {"name": "Gold", "price": 5000, "capacity": 100}
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/events")
+                        .header("X-User-Role", "CUSTOMER")
+                        .contentType("application/json")
+                        .content(createJson))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void updateEvent_rejectsNonAdminRoleWith403() throws Exception {
+        String createJson = """
+                {
+                  "name": "Tour Stop",
+                  "description": "desc",
+                  "eventDate": "2027-03-01T20:00:00",
+                  "venue": "Venue",
+                  "bannerUrl": null,
+                  "tiers": [
+                    {"name": "Silver", "price": 1000, "capacity": 5}
+                  ]
+                }
+                """;
+
+        String createResponse = mockMvc.perform(post("/api/events")
+                        .header("X-User-Role", "ADMIN")
+                        .contentType("application/json")
+                        .content(createJson))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        String eventId = JsonPath.read(createResponse, "$.id");
+
+        String updateJson = """
+                {
+                  "name": "Tour Stop - Rescheduled",
+                  "description": "desc",
+                  "eventDate": "2027-04-01T20:00:00",
+                  "venue": "Venue",
+                  "bannerUrl": null
+                }
+                """;
+
+        mockMvc.perform(put("/api/events/{id}", eventId)
+                        .header("X-User-Role", "CUSTOMER")
+                        .contentType("application/json")
+                        .content(updateJson))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void deleteEvent_rejectsNonAdminRoleWith403() throws Exception {
+        String createJson = """
+                {
+                  "name": "Tour Stop",
+                  "description": "desc",
+                  "eventDate": "2027-03-01T20:00:00",
+                  "venue": "Venue",
+                  "bannerUrl": null,
+                  "tiers": [
+                    {"name": "Silver", "price": 1000, "capacity": 5}
+                  ]
+                }
+                """;
+
+        String createResponse = mockMvc.perform(post("/api/events")
+                        .header("X-User-Role", "ADMIN")
+                        .contentType("application/json")
+                        .content(createJson))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        String eventId = JsonPath.read(createResponse, "$.id");
+
+        mockMvc.perform(delete("/api/events/{id}", eventId)
+                        .header("X-User-Role", "CUSTOMER"))
+                .andExpect(status().isForbidden());
     }
 }

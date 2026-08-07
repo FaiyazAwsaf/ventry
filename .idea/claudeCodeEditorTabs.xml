@@ -1,25 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ClaudeCodeEditorTabs">
-    <option name="activeSessionId" value="c0d5e1e4-b3ee-44c4-bb2e-a19753171717" />
+    <option name="activeSessionId" value="35f48ce6-ec5f-4fe4-afd4-69c04ee43875" />
     <option name="openSessionIds">
       <list>
         <option value="c9ed3026-b698-40cc-a4b8-b17f53aa1f4b" />
         <option value="c0d5e1e4-b3ee-44c4-bb2e-a19753171717" />
+        <option value="a93bd611-aa3b-4d83-97ee-43817a1568cf" />
+        <option value="db5c8d1a-6f68-4459-a0d1-84c6f28c583d" />
+        <option value="35f48ce6-ec5f-4fe4-afd4-69c04ee43875" />
       </list>
     </option>
     <option name="sessionPaths">
       <map>
+        <entry key="35f48ce6-ec5f-4fe4-afd4-69c04ee43875" value="/sessions/0ec39c7d-db72-4702-8595-9da3b4b10039" />
         <entry key="5992654d-5fc5-43d5-97bd-6b9244c1bda6" value="/sessions/e4e45ee0-a59f-46d8-a0b0-dac757c26cb7" />
+        <entry key="a93bd611-aa3b-4d83-97ee-43817a1568cf" value="/sessions/e4e45ee0-a59f-46d8-a0b0-dac757c26cb7" />
         <entry key="c0d5e1e4-b3ee-44c4-bb2e-a19753171717" value="/sessions/e4e45ee0-a59f-46d8-a0b0-dac757c26cb7" />
         <entry key="c9ed3026-b698-40cc-a4b8-b17f53aa1f4b" value="/sessions/2e2be154-40cf-424e-ad40-cf50a75648ec" />
+        <entry key="db5c8d1a-6f68-4459-a0d1-84c6f28c583d" value="/sessions/0ec39c7d-db72-4702-8595-9da3b4b10039" />
       </map>
     </option>
     <option name="sessionTitles">
       <map>
+        <entry key="35f48ce6-ec5f-4fe4-afd4-69c04ee43875" value="Read the following files completely before doing a" />
         <entry key="5992654d-5fc5-43d5-97bd-6b9244c1bda6" value="Read the following files completely before doing a" />
+        <entry key="a93bd611-aa3b-4d83-97ee-43817a1568cf" value="Phase 4 (payment service + booking service)" />
         <entry key="c0d5e1e4-b3ee-44c4-bb2e-a19753171717" value="Read the following files completely before doing a" />
         <entry key="c9ed3026-b698-40cc-a4b8-b17f53aa1f4b" value="phase 2 and 3" />
+        <entry key="db5c8d1a-6f68-4459-a0d1-84c6f28c583d" value="Read the following files completely before doing a" />
       </map>
     </option>
   </component>
