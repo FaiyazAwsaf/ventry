@@ -29,10 +29,6 @@ Every pattern here earns its place rather than being added for keyword coverage:
   threads, capacity 10 → exactly 10 succeed, zero oversell — see `TicketTierInventoryIT`).
 - **CQRS, Circuit Breaker** — architecturally scoped now, built next (see [Roadmap](#roadmap)).
 
-Every non-obvious engineering decision — and there are many, e.g. why the admin-role check is
-a one-line inline check instead of Spring Security, why analytics reports "reserved" instead
-of "sold," why `@Modifying` repository queries need their own `@Transactional` — is logged with
-its reasoning in [`docs/progress.md`](docs/progress.md), not just implemented silently.
 
 ## Architecture
 
@@ -156,28 +152,3 @@ against a real local Postgres for integration tests (no H2, to avoid Postgres/H2
 drift — see `docs/progress.md`). Concurrency-sensitive logic (inventory reservation) has a
 dedicated load test, not just a happy-path unit test.
 
-## Documentation
-
-- [`docs/architecture.md`](docs/architecture.md) — system requirements, patterns, Kafka topics, NFRs
-- [`docs/api-contracts.md`](docs/api-contracts.md) — every REST endpoint and Kafka contract, verified against source, gaps called out explicitly
-- [`docs/progress.md`](docs/progress.md) — milestone-by-milestone log with the reasoning behind every non-obvious decision
-
-## Roadmap
-
-Currently past the core write path and the primary booking Saga. Next up: the Cancellation
-Saga + QR/Notification services, then the CQRS read side, Event Sourcing replay, and
-Resilience4j circuit breakers. Full detail in [`docs/progress.md`](docs/progress.md).
-
-## Known gaps (tracked, not hidden)
-
-A portfolio project should be honest about what's incomplete rather than looking finished when
-it isn't:
-
-- No containerization of the Spring Boot services themselves yet (only infra — Postgres/Redis/Kafka)
-- No CI pipeline
-- No Actuator health endpoints wired yet
-- `api-gateway`'s JWT secret has a hardcoded local-dev fallback — fine for `docker-compose up`, not for any real deployment
-- No transactional outbox — a crash between Booking Service's DB commit and its Kafka publish can strand a booking `PENDING`
-
-Full list, with the reasoning behind each accepted gap, in
-[`docs/progress.md`](docs/progress.md)'s Release Readiness milestone.
