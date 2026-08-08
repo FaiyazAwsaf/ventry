@@ -8,6 +8,7 @@ import com.ventry.event.dto.TierResponse;
 import com.ventry.event.dto.UpdateEventRequest;
 import com.ventry.event.entity.Event;
 import com.ventry.event.entity.TicketTier;
+import com.ventry.event.exception.EventHasActiveBookingsException;
 import com.ventry.event.exception.EventNotFoundException;
 import com.ventry.event.exception.InsufficientInventoryException;
 import com.ventry.event.exception.TierNotFoundException;
@@ -70,10 +71,14 @@ public class EventService {
 
     @CacheEvict(value = "events", allEntries = true)
     public void deleteEvent(String eventId) {
-        if (!eventRepository.existsById(eventId)) {
-            throw new EventNotFoundException(eventId);
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new EventNotFoundException(eventId));
+        boolean hasActiveBookings = event.getTiers().stream()
+                .anyMatch(tier -> tier.getAvailable() < tier.getCapacity());
+        if (hasActiveBookings) {
+            throw new EventHasActiveBookingsException(eventId);
         }
-        eventRepository.deleteById(eventId);
+        eventRepository.delete(event);
     }
 
     public TierAvailabilityResponse checkAvailability(String eventId, String tierId, int quantity) {

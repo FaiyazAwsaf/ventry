@@ -290,4 +290,39 @@ class EventControllerIT {
                         .header("X-User-Role", "CUSTOMER"))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void deleteEvent_rejectsEventWithReservedInventoryWith409() throws Exception {
+        String createJson = """
+                {
+                  "name": "Tour Stop",
+                  "description": "desc",
+                  "eventDate": "2027-03-01T20:00:00",
+                  "venue": "Venue",
+                  "bannerUrl": null,
+                  "tiers": [
+                    {"name": "Silver", "price": 1000, "capacity": 5}
+                  ]
+                }
+                """;
+
+        String createResponse = mockMvc.perform(post("/api/events")
+                        .header("X-User-Role", "ADMIN")
+                        .contentType("application/json")
+                        .content(createJson))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        String eventId = JsonPath.read(createResponse, "$.id");
+        String tierId = JsonPath.read(createResponse, "$.tiers[0].id");
+
+        mockMvc.perform(post("/api/events/{eventId}/tiers/{tierId}/reserve", eventId, tierId)
+                        .contentType("application/json")
+                        .content("{\"quantity\": 1}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/events/{id}", eventId)
+                        .header("X-User-Role", "ADMIN"))
+                .andExpect(status().isConflict());
+    }
 }
