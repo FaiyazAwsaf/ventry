@@ -8,8 +8,10 @@ import com.ventry.event.dto.UpdateEventRequest;
 import com.ventry.event.exception.ForbiddenException;
 import com.ventry.event.service.EventService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,6 +27,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/events")
+@Validated
 public class EventController {
 
     private final EventService eventService;
@@ -82,7 +85,7 @@ public class EventController {
     public TierAvailabilityResponse checkAvailability(
             @PathVariable String eventId,
             @PathVariable String tierId,
-            @RequestParam int quantity
+            @Positive @RequestParam int quantity
     ) {
         return eventService.checkAvailability(eventId, tierId, quantity);
     }

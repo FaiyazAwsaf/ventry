@@ -166,6 +166,40 @@ class EventControllerIT {
     }
 
     @Test
+    void tierAvailability_rejectsNonPositiveQuantityWith400() throws Exception {
+        String createJson = """
+                {
+                  "name": "Tour Stop",
+                  "description": "desc",
+                  "eventDate": "2027-03-01T20:00:00",
+                  "venue": "Venue",
+                  "bannerUrl": null,
+                  "tiers": [
+                    {"name": "Silver", "price": 1000, "capacity": 5}
+                  ]
+                }
+                """;
+
+        String createResponse = mockMvc.perform(post("/api/events")
+                        .header("X-User-Role", "ADMIN")
+                        .contentType("application/json")
+                        .content(createJson))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        String eventId = JsonPath.read(createResponse, "$.id");
+        String tierId = JsonPath.read(createResponse, "$.tiers[0].id");
+
+        mockMvc.perform(get("/api/events/{eventId}/tiers/{tierId}/availability", eventId, tierId)
+                        .param("quantity", "0"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/events/{eventId}/tiers/{tierId}/availability", eventId, tierId)
+                        .param("quantity", "-1"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void createEvent_rejectsNonAdminRoleWith403() throws Exception {
         String createJson = """
                 {
