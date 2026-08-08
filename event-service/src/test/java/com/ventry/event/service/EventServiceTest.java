@@ -2,6 +2,7 @@ package com.ventry.event.service;
 
 import com.ventry.event.dto.CreateEventRequest;
 import com.ventry.event.dto.CreateTierRequest;
+import com.ventry.event.dto.EventAnalyticsResponse;
 import com.ventry.event.dto.EventResponse;
 import com.ventry.event.dto.TierAvailabilityResponse;
 import com.ventry.event.entity.Event;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -155,5 +157,46 @@ class EventServiceTest {
 
         assertThatThrownBy(() -> eventService.releaseInventory("event-1", "tier-1", 2))
                 .isInstanceOf(TierNotFoundException.class);
+    }
+
+    @Test
+    void getEventAnalytics_reportsZeroReservedAndRevenueForFreshEvent() {
+        Event event = new Event("Concert", "desc", LocalDateTime.now().plusDays(10), "Venue", null);
+        event.addTier(new TicketTier("Gold", new BigDecimal("100"), 10));
+        when(eventRepository.findById(event.getId())).thenReturn(Optional.of(event));
+
+        EventAnalyticsResponse response = eventService.getEventAnalytics(event.getId());
+
+        assertThat(response.totalCapacity()).isEqualTo(10);
+        assertThat(response.totalReserved()).isEqualTo(0);
+        assertThat(response.totalRevenue()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(response.tiers().get(0).reserved()).isEqualTo(0);
+    }
+
+    @Test
+    void getEventAnalytics_computesReservedAndRevenueFromAvailableGap() {
+        Event event = new Event("Concert", "desc", LocalDateTime.now().plusDays(10), "Venue", null);
+        TicketTier tier = new TicketTier("Gold", new BigDecimal("100"), 10);
+        event.addTier(tier);
+        // TicketTier deliberately has no public setter for `available` - inventory only
+        // changes via the repository's atomic @Modifying reserve/release queries, never
+        // through the entity. Forcing it here is the only way to simulate "some reserved"
+        // state without going through a real DB.
+        ReflectionTestUtils.setField(tier, "available", 4);
+        when(eventRepository.findById(event.getId())).thenReturn(Optional.of(event));
+
+        EventAnalyticsResponse response = eventService.getEventAnalytics(event.getId());
+
+        assertThat(response.totalReserved()).isEqualTo(6);
+        assertThat(response.totalRevenue()).isEqualByComparingTo(new BigDecimal("600"));
+        assertThat(response.tiers().get(0).available()).isEqualTo(4);
+    }
+
+    @Test
+    void getEventAnalytics_throwsWhenEventNotFound() {
+        when(eventRepository.findById("missing-id")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> eventService.getEventAnalytics("missing-id"))
+                .isInstanceOf(EventNotFoundException.class);
     }
 }

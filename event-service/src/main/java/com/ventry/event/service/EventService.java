@@ -2,7 +2,9 @@ package com.ventry.event.service;
 
 import com.ventry.event.dto.CreateEventRequest;
 import com.ventry.event.dto.CreateTierRequest;
+import com.ventry.event.dto.EventAnalyticsResponse;
 import com.ventry.event.dto.EventResponse;
+import com.ventry.event.dto.TierAnalyticsResponse;
 import com.ventry.event.dto.TierAvailabilityResponse;
 import com.ventry.event.dto.TierResponse;
 import com.ventry.event.dto.UpdateEventRequest;
@@ -19,6 +21,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -85,6 +88,29 @@ public class EventService {
         TicketTier tier = ticketTierRepository.findByIdAndEventId(tierId, eventId)
                 .orElseThrow(() -> new TierNotFoundException(eventId, tierId));
         return new TierAvailabilityResponse(tier.getAvailable() >= quantity, tier.getAvailable());
+    }
+
+    public EventAnalyticsResponse getEventAnalytics(String eventId) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new EventNotFoundException(eventId));
+
+        List<TierAnalyticsResponse> tierAnalytics = event.getTiers().stream()
+                .map(tier -> {
+                    int reserved = tier.getCapacity() - tier.getAvailable();
+                    BigDecimal revenue = tier.getPrice().multiply(BigDecimal.valueOf(reserved));
+                    return new TierAnalyticsResponse(
+                            tier.getId(), tier.getName(), tier.getCapacity(), tier.getAvailable(), reserved, revenue);
+                })
+                .toList();
+
+        int totalCapacity = tierAnalytics.stream().mapToInt(TierAnalyticsResponse::capacity).sum();
+        int totalReserved = tierAnalytics.stream().mapToInt(TierAnalyticsResponse::reserved).sum();
+        BigDecimal totalRevenue = tierAnalytics.stream()
+                .map(TierAnalyticsResponse::revenue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return new EventAnalyticsResponse(
+                event.getId(), event.getName(), totalCapacity, totalReserved, totalRevenue, tierAnalytics);
     }
 
     // Custom @Modifying repository queries, unlike Spring Data's own built-in save()/deleteById(),

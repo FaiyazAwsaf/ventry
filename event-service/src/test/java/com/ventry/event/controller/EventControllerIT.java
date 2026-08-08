@@ -325,4 +325,80 @@ class EventControllerIT {
                         .header("X-User-Role", "ADMIN"))
                 .andExpect(status().isConflict());
     }
+
+    @Test
+    void getEventAnalytics_reflectsReservedInventoryAndRevenue() throws Exception {
+        String createJson = """
+                {
+                  "name": "Tour Stop",
+                  "description": "desc",
+                  "eventDate": "2027-03-01T20:00:00",
+                  "venue": "Venue",
+                  "bannerUrl": null,
+                  "tiers": [
+                    {"name": "Silver", "price": 100, "capacity": 10}
+                  ]
+                }
+                """;
+
+        String createResponse = mockMvc.perform(post("/api/events")
+                        .header("X-User-Role", "ADMIN")
+                        .contentType("application/json")
+                        .content(createJson))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        String eventId = JsonPath.read(createResponse, "$.id");
+        String tierId = JsonPath.read(createResponse, "$.tiers[0].id");
+
+        mockMvc.perform(post("/api/events/{eventId}/tiers/{tierId}/reserve", eventId, tierId)
+                        .contentType("application/json")
+                        .content("{\"quantity\": 3}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/events/{id}/analytics", eventId)
+                        .header("X-User-Role", "ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCapacity").value(10))
+                .andExpect(jsonPath("$.totalReserved").value(3))
+                .andExpect(jsonPath("$.totalRevenue").value(300))
+                .andExpect(jsonPath("$.tiers[0].reserved").value(3))
+                .andExpect(jsonPath("$.tiers[0].revenue").value(300));
+    }
+
+    @Test
+    void getEventAnalytics_rejectsNonAdminRoleWith403() throws Exception {
+        String createJson = """
+                {
+                  "name": "Tour Stop",
+                  "description": "desc",
+                  "eventDate": "2027-03-01T20:00:00",
+                  "venue": "Venue",
+                  "bannerUrl": null,
+                  "tiers": [
+                    {"name": "Silver", "price": 100, "capacity": 10}
+                  ]
+                }
+                """;
+
+        String createResponse = mockMvc.perform(post("/api/events")
+                        .header("X-User-Role", "ADMIN")
+                        .contentType("application/json")
+                        .content(createJson))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        String eventId = JsonPath.read(createResponse, "$.id");
+
+        mockMvc.perform(get("/api/events/{id}/analytics", eventId)
+                        .header("X-User-Role", "CUSTOMER"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getEventAnalytics_returnsNotFoundForUnknownEvent() throws Exception {
+        mockMvc.perform(get("/api/events/{id}/analytics", "does-not-exist")
+                        .header("X-User-Role", "ADMIN"))
+                .andExpect(status().isNotFound());
+    }
 }

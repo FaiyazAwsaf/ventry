@@ -1,6 +1,7 @@
 package com.ventry.event.controller;
 
 import com.ventry.event.dto.CreateEventRequest;
+import com.ventry.event.dto.EventAnalyticsResponse;
 import com.ventry.event.dto.EventResponse;
 import com.ventry.event.dto.InventoryAdjustmentRequest;
 import com.ventry.event.dto.TierAvailabilityResponse;
@@ -79,6 +80,17 @@ public class EventController {
         }
         eventService.deleteEvent(eventId);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{eventId}/analytics")
+    public EventAnalyticsResponse getEventAnalytics(
+            @RequestHeader("X-User-Role") String role,
+            @PathVariable String eventId
+    ) {
+        if (!"ADMIN".equals(role)) {
+            throw new ForbiddenException(role);
+        }
+        return eventService.getEventAnalytics(eventId);
     }
 
     @GetMapping("/{eventId}/tiers/{tierId}/availability")
