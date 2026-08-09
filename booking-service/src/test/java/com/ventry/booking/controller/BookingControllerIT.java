@@ -2,6 +2,7 @@ package com.ventry.booking.controller;
 
 import com.jayway.jsonpath.JsonPath;
 import com.ventry.booking.client.EventServiceClient;
+import com.ventry.booking.entity.Booking;
 import com.ventry.booking.exception.EventOrTierNotFoundException;
 import com.ventry.booking.exception.TierUnavailableException;
 import com.ventry.booking.kafka.BookingEventProducer;
@@ -135,5 +136,52 @@ class BookingControllerIT {
                         .contentType("application/json")
                         .content(requestJson))
                 .andExpect(status().isBadRequest());
+    }
+
+    private Booking seedConfirmedBooking(String customerId) {
+        Booking booking = new Booking(customerId, "event-1", "tier-1", 2, BigDecimal.valueOf(1000));
+        booking.confirm();
+        return bookingRepository.save(booking);
+    }
+
+    @Test
+    void cancelBooking_transitionsConfirmedBookingToCancellationPending() throws Exception {
+        Booking booking = seedConfirmedBooking("customer-1");
+
+        mockMvc.perform(post("/api/bookings/{bookingId}/cancel", booking.getBookingId())
+                        .header("X-User-Id", "customer-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLATION_PENDING"));
+
+        verify(bookingEventProducer).publishBookingCancelled(any());
+        assertThat(bookingEventRepository.findAll())
+                .anyMatch(e -> e.getBookingId().equals(booking.getBookingId())
+                        && e.getEventType().equals("BOOKING_CANCELLATION_REQUESTED"));
+    }
+
+    @Test
+    void cancelBooking_rejectsNonOwnerWith403() throws Exception {
+        Booking booking = seedConfirmedBooking("customer-1");
+
+        mockMvc.perform(post("/api/bookings/{bookingId}/cancel", booking.getBookingId())
+                        .header("X-User-Id", "someone-else"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void cancelBooking_rejectsNotYetConfirmedBookingWith409() throws Exception {
+        Booking booking = bookingRepository.save(
+                new Booking("customer-1", "event-1", "tier-1", 2, BigDecimal.valueOf(1000)));
+
+        mockMvc.perform(post("/api/bookings/{bookingId}/cancel", booking.getBookingId())
+                        .header("X-User-Id", "customer-1"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void cancelBooking_returns404ForUnknownBooking() throws Exception {
+        mockMvc.perform(post("/api/bookings/{bookingId}/cancel", "does-not-exist")
+                        .header("X-User-Id", "customer-1"))
+                .andExpect(status().isNotFound());
     }
 }

@@ -105,4 +105,17 @@ public class Booking {
         status = Status.FAILED;
         return true;
     }
+
+    /**
+     * Only a CONFIRMED booking can be cancelled (architecture.md §3.5) - a PENDING booking
+     * is still mid-Saga with no confirmed payment to refund, and FAILED/CANCELLED are
+     * already terminal.
+     */
+    public boolean cancel() {
+        if (status != Status.CONFIRMED) {
+            return false;
+        }
+        status = Status.CANCELLATION_PENDING;
+        return true;
+    }
 }

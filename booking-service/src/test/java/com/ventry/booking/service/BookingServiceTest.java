@@ -4,11 +4,14 @@ import com.ventry.booking.client.EventServiceClient;
 import com.ventry.booking.dto.BookingResponse;
 import com.ventry.booking.dto.CreateBookingRequest;
 import com.ventry.booking.entity.Booking;
+import com.ventry.booking.exception.BookingNotCancellableException;
 import com.ventry.booking.exception.BookingNotFoundException;
+import com.ventry.booking.exception.BookingOwnershipException;
 import com.ventry.booking.exception.EventOrTierNotFoundException;
 import com.ventry.booking.exception.TierUnavailableException;
 import com.ventry.booking.kafka.BookingEventProducer;
 import com.ventry.booking.repository.BookingRepository;
+import com.ventry.common.events.BookingCancelledEvent;
 import com.ventry.common.events.BookingConfirmedEvent;
 import com.ventry.common.events.BookingInitiatedEvent;
 import com.ventry.common.events.PaymentFailedEvent;
@@ -171,5 +174,60 @@ class BookingServiceTest {
 
         verify(bookingEventStore, never()).append(any(), any(), any());
         verify(eventServiceClient, never()).releaseInventory(any(), any(), anyInt());
+    }
+
+    @Test
+    void cancelBooking_transitionsConfirmedBookingAndPublishesBookingCancelled() {
+        Booking booking = new Booking("customer-1", "event-1", "tier-1", 2, BigDecimal.valueOf(1000));
+        booking.confirm();
+        String bookingId = booking.getBookingId();
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+
+        BookingResponse response = bookingService.cancelBooking(bookingId, "customer-1");
+
+        assertThat(booking.getStatus()).isEqualTo(Booking.Status.CANCELLATION_PENDING);
+        assertThat(response.status()).isEqualTo("CANCELLATION_PENDING");
+
+        ArgumentCaptor<BookingCancelledEvent> captor = ArgumentCaptor.forClass(BookingCancelledEvent.class);
+        verify(bookingEventStore).append(eq(booking), eq("BOOKING_CANCELLATION_REQUESTED"), captor.capture());
+        assertThat(captor.getValue().bookingId()).isEqualTo(bookingId);
+        assertThat(captor.getValue().totalAmount()).isEqualByComparingTo(BigDecimal.valueOf(1000));
+
+        verify(bookingEventProducer).publishBookingCancelled(captor.getValue());
+    }
+
+    @Test
+    void cancelBooking_throwsOwnershipExceptionForNonOwner() {
+        Booking booking = new Booking("customer-1", "event-1", "tier-1", 2, BigDecimal.valueOf(1000));
+        booking.confirm();
+        String bookingId = booking.getBookingId();
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+
+        assertThatThrownBy(() -> bookingService.cancelBooking(bookingId, "someone-else"))
+                .isInstanceOf(BookingOwnershipException.class);
+
+        verify(bookingEventStore, never()).append(any(), any(), any());
+        verify(bookingEventProducer, never()).publishBookingCancelled(any());
+    }
+
+    @Test
+    void cancelBooking_throwsNotCancellableWhenStillPending() {
+        Booking booking = new Booking("customer-1", "event-1", "tier-1", 2, BigDecimal.valueOf(1000));
+        String bookingId = booking.getBookingId();
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+
+        assertThatThrownBy(() -> bookingService.cancelBooking(bookingId, "customer-1"))
+                .isInstanceOf(BookingNotCancellableException.class);
+
+        verify(bookingEventStore, never()).append(any(), any(), any());
+        verify(bookingEventProducer, never()).publishBookingCancelled(any());
+    }
+
+    @Test
+    void cancelBooking_throwsWhenBookingUnknown() {
+        when(bookingRepository.findById("missing-booking")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> bookingService.cancelBooking("missing-booking", "customer-1"))
+                .isInstanceOf(BookingNotFoundException.class);
     }
 }

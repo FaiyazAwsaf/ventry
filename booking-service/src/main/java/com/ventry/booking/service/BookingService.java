@@ -4,9 +4,12 @@ import com.ventry.booking.client.EventServiceClient;
 import com.ventry.booking.dto.BookingResponse;
 import com.ventry.booking.dto.CreateBookingRequest;
 import com.ventry.booking.entity.Booking;
+import com.ventry.booking.exception.BookingNotCancellableException;
 import com.ventry.booking.exception.BookingNotFoundException;
+import com.ventry.booking.exception.BookingOwnershipException;
 import com.ventry.booking.kafka.BookingEventProducer;
 import com.ventry.booking.repository.BookingRepository;
+import com.ventry.common.events.BookingCancelledEvent;
 import com.ventry.common.events.BookingConfirmedEvent;
 import com.ventry.common.events.BookingInitiatedEvent;
 import com.ventry.common.events.PaymentFailedEvent;
@@ -21,6 +24,7 @@ public class BookingService {
     private static final String BOOKING_INITIATED = "BOOKING_INITIATED";
     private static final String BOOKING_CONFIRMED = "BOOKING_CONFIRMED";
     private static final String BOOKING_FAILED = "BOOKING_FAILED";
+    private static final String BOOKING_CANCELLATION_REQUESTED = "BOOKING_CANCELLATION_REQUESTED";
 
     private final EventServiceClient eventServiceClient;
     private final BookingRepository bookingRepository;
@@ -99,6 +103,30 @@ public class BookingService {
 
         bookingEventStore.append(booking, BOOKING_FAILED, event);
         eventServiceClient.releaseInventory(booking.getEventId(), booking.getTierId(), booking.getQuantity());
+    }
+
+    /**
+     * The trigger for the compensating Saga. Ownership is checked before the state
+     * transition is even attempted - a non-owner shouldn't be able to force a wasted
+     * mutation attempt on someone else's booking.
+     */
+    public BookingResponse cancelBooking(String bookingId, String customerId) {
+        Booking booking = findBookingOrThrow(bookingId);
+
+        if (!booking.getCustomerId().equals(customerId)) {
+            throw new BookingOwnershipException(bookingId);
+        }
+        if (!booking.cancel()) {
+            throw new BookingNotCancellableException(bookingId, booking.getStatus());
+        }
+
+        BookingCancelledEvent event = new BookingCancelledEvent(
+                booking.getBookingId(), booking.getCustomerId(), booking.getTotalAmount());
+
+        bookingEventStore.append(booking, BOOKING_CANCELLATION_REQUESTED, event);
+        bookingEventProducer.publishBookingCancelled(event);
+
+        return toResponse(booking);
     }
 
     private Booking findBookingOrThrow(String bookingId) {

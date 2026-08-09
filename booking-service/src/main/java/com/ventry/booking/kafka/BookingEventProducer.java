@@ -1,5 +1,6 @@
 package com.ventry.booking.kafka;
 
+import com.ventry.common.events.BookingCancelledEvent;
 import com.ventry.common.events.BookingConfirmedEvent;
 import com.ventry.common.events.BookingInitiatedEvent;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -10,6 +11,7 @@ public class BookingEventProducer {
 
     private static final String BOOKING_INITIATED_TOPIC = "booking.initiated";
     private static final String BOOKING_CONFIRMED_TOPIC = "booking.confirmed";
+    private static final String BOOKING_CANCELLED_TOPIC = "booking.cancelled";
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
@@ -31,5 +33,13 @@ public class BookingEventProducer {
      */
     public void publishBookingConfirmed(BookingConfirmedEvent event) {
         kafkaTemplate.send(BOOKING_CONFIRMED_TOPIC, event.bookingId(), event);
+    }
+
+    /**
+     * Consumed next by Payment Service (initiates the refund) - keyed by bookingId for the
+     * same ordering reason as the other publish methods.
+     */
+    public void publishBookingCancelled(BookingCancelledEvent event) {
+        kafkaTemplate.send(BOOKING_CANCELLED_TOPIC, event.bookingId(), event);
     }
 }
