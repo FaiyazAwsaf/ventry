@@ -27,7 +27,8 @@ Every pattern here earns its place rather than being added for keyword coverage:
 - **Atomic inventory control under concurrency** — ticket reservation is a single conditional
   `UPDATE ... WHERE available >= quantity`, proven race-free under real concurrent load (20
   threads, capacity 10 → exactly 10 succeed, zero oversell — see `TicketTierInventoryIT`).
-- **CQRS, Circuit Breaker** — architecturally scoped now, built next (see [Roadmap](#roadmap)).
+- **CQRS, Circuit Breaker** — architecturally scoped now, built next (see
+  [`docs/progress.md`](docs/progress.md) for current status).
 
 
 ## Architecture
@@ -167,7 +168,14 @@ curl localhost:8080/api/tickets/<booking-id>/qr -H "Authorization: Bearer $TOKEN
 curl -X POST localhost:8080/api/tickets/validate -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"qrContent":"<content encoded in the scanned QR>"}'
+
+# Cancel a confirmed booking (must be CONFIRMED - the compensating Saga's trigger)
+curl -X POST localhost:8080/api/bookings/<booking-id>/cancel -H "Authorization: Bearer $TOKEN"
 ```
+
+Watch the logs again: `booking.cancelled` → Payment Service refunds → `refund.processed` →
+Booking Service restores inventory and flips the booking to `CANCELLED`. The response to the
+cancel call itself only reflects `CANCELLATION_PENDING` — completion happens asynchronously.
 
 ## Testing
 
