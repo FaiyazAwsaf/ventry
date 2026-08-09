@@ -16,6 +16,7 @@ import com.ventry.common.events.BookingConfirmedEvent;
 import com.ventry.common.events.BookingInitiatedEvent;
 import com.ventry.common.events.PaymentFailedEvent;
 import com.ventry.common.events.PaymentSuccessEvent;
+import com.ventry.common.events.RefundProcessedEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -228,6 +229,45 @@ class BookingServiceTest {
         when(bookingRepository.findById("missing-booking")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> bookingService.cancelBooking("missing-booking", "customer-1"))
+                .isInstanceOf(BookingNotFoundException.class);
+    }
+
+    @Test
+    void completeCancellation_transitionsCancellationPendingBookingAndReleasesInventory() {
+        Booking booking = new Booking("customer-1", "event-1", "tier-1", 2, BigDecimal.valueOf(1000));
+        booking.confirm();
+        booking.cancel();
+        String bookingId = booking.getBookingId();
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+
+        RefundProcessedEvent event = new RefundProcessedEvent(bookingId);
+        bookingService.completeCancellation(event);
+
+        assertThat(booking.getStatus()).isEqualTo(Booking.Status.CANCELLED);
+        verify(bookingEventStore).append(booking, "BOOKING_CANCELLED", event);
+        verify(eventServiceClient).releaseInventory("event-1", "tier-1", 2);
+    }
+
+    @Test
+    void completeCancellation_redeliveredEventOnAlreadyCancelledBookingIsNoOp() {
+        Booking booking = new Booking("customer-1", "event-1", "tier-1", 2, BigDecimal.valueOf(1000));
+        booking.confirm();
+        booking.cancel();
+        booking.completeCancellation();
+        String bookingId = booking.getBookingId();
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+
+        bookingService.completeCancellation(new RefundProcessedEvent(bookingId));
+
+        verify(bookingEventStore, never()).append(any(), any(), any());
+        verify(eventServiceClient, never()).releaseInventory(any(), any(), anyInt());
+    }
+
+    @Test
+    void completeCancellation_throwsWhenBookingUnknown() {
+        when(bookingRepository.findById("missing-booking")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> bookingService.completeCancellation(new RefundProcessedEvent("missing-booking")))
                 .isInstanceOf(BookingNotFoundException.class);
     }
 }

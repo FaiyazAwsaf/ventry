@@ -118,4 +118,16 @@ public class Booking {
         status = Status.CANCELLATION_PENDING;
         return true;
     }
+
+    /**
+     * Idempotent on refund.processed redelivery, same reasoning as confirm()/markFailed() -
+     * guards the compensating releaseInventory REST call from firing twice.
+     */
+    public boolean completeCancellation() {
+        if (status != Status.CANCELLATION_PENDING) {
+            return false;
+        }
+        status = Status.CANCELLED;
+        return true;
+    }
 }

@@ -14,6 +14,7 @@ import com.ventry.common.events.BookingConfirmedEvent;
 import com.ventry.common.events.BookingInitiatedEvent;
 import com.ventry.common.events.PaymentFailedEvent;
 import com.ventry.common.events.PaymentSuccessEvent;
+import com.ventry.common.events.RefundProcessedEvent;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -25,6 +26,7 @@ public class BookingService {
     private static final String BOOKING_CONFIRMED = "BOOKING_CONFIRMED";
     private static final String BOOKING_FAILED = "BOOKING_FAILED";
     private static final String BOOKING_CANCELLATION_REQUESTED = "BOOKING_CANCELLATION_REQUESTED";
+    private static final String BOOKING_CANCELLED = "BOOKING_CANCELLED";
 
     private final EventServiceClient eventServiceClient;
     private final BookingRepository bookingRepository;
@@ -127,6 +129,24 @@ public class BookingService {
         bookingEventProducer.publishBookingCancelled(event);
 
         return toResponse(booking);
+    }
+
+    /**
+     * Consumes refund.processed - the compensating Saga's terminal step. Same idempotency
+     * guard as confirmBooking/failBooking stops releaseInventory from firing twice on a
+     * redelivery. No further Kafka publish here: refund.processed itself already reaches
+     * Notification Service directly (architecture.md §5.3), so there's no
+     * cancellation.confirmed to republish.
+     */
+    public void completeCancellation(RefundProcessedEvent event) {
+        Booking booking = findBookingOrThrow(event.bookingId());
+
+        if (!booking.completeCancellation()) {
+            return;
+        }
+
+        bookingEventStore.append(booking, BOOKING_CANCELLED, event);
+        eventServiceClient.releaseInventory(booking.getEventId(), booking.getTierId(), booking.getQuantity());
     }
 
     private Booking findBookingOrThrow(String bookingId) {
