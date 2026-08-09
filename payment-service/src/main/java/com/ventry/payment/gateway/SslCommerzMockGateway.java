@@ -26,6 +26,11 @@ public class SslCommerzMockGateway implements PaymentGateway {
     }
 
     @Override
+    public void refund(String bookingId, BigDecimal amount) {
+        // Mock: a real integration would call SSLCommerz's refund API here.
+    }
+
+    @Override
     public String name() {
         return "SSLCOMMERZ";
     }

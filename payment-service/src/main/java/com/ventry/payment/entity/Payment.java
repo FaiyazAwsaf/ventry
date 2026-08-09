@@ -34,7 +34,7 @@ public class Payment {
     @Column(nullable = false)
     private Instant processedAt;
 
-    public enum Status { SUCCESS, FAILED }
+    public enum Status { SUCCESS, FAILED, REFUNDED }
 
     protected Payment() {
     }
@@ -70,5 +70,18 @@ public class Payment {
 
     public Instant getProcessedAt() {
         return processedAt;
+    }
+
+    /**
+     * Idempotent on booking.cancelled redelivery, same idiom as Booking.confirm() - only a
+     * SUCCESS payment can be refunded, so a redelivered cancellation for an already-REFUNDED
+     * payment is a no-op rather than refunding twice.
+     */
+    public boolean refund() {
+        if (status != Status.SUCCESS) {
+            return false;
+        }
+        status = Status.REFUNDED;
+        return true;
     }
 }
