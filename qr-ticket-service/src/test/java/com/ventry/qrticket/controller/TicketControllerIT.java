@@ -10,7 +10,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -101,5 +103,31 @@ class TicketControllerIT {
                         .contentType("application/json")
                         .content(validateBody(ticket.getQrContent())))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getQrImage_returnsPngForTheOwningCustomer() throws Exception {
+        seedTicket("booking-5");
+
+        mockMvc.perform(get("/api/tickets/{bookingId}/qr", "booking-5")
+                        .header("X-User-Id", "customer-1"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("image/png"));
+    }
+
+    @Test
+    void getQrImage_rejectsNonOwningCustomerWith403() throws Exception {
+        seedTicket("booking-6");
+
+        mockMvc.perform(get("/api/tickets/{bookingId}/qr", "booking-6")
+                        .header("X-User-Id", "someone-else"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getQrImage_returnsNotFoundForUnknownBooking() throws Exception {
+        mockMvc.perform(get("/api/tickets/{bookingId}/qr", "does-not-exist")
+                        .header("X-User-Id", "customer-1"))
+                .andExpect(status().isNotFound());
     }
 }

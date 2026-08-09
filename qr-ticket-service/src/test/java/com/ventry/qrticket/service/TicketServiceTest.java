@@ -28,11 +28,14 @@ class TicketServiceTest {
     @Mock
     private TicketEventProducer ticketEventProducer;
 
+    @Mock
+    private QrCodeGenerator qrCodeGenerator;
+
     private TicketService ticketService;
 
     @BeforeEach
     void setUp() {
-        ticketService = new TicketService(ticketRepository, ticketEventProducer, new ObjectMapper());
+        ticketService = new TicketService(ticketRepository, ticketEventProducer, qrCodeGenerator, new ObjectMapper());
     }
 
     @Test

@@ -6,6 +6,7 @@ import com.ventry.common.events.BookingConfirmedEvent;
 import com.ventry.common.events.TicketGeneratedEvent;
 import com.ventry.qrticket.dto.QrPayload;
 import com.ventry.qrticket.entity.Ticket;
+import com.ventry.qrticket.exception.ForbiddenException;
 import com.ventry.qrticket.exception.TicketAlreadyValidatedException;
 import com.ventry.qrticket.exception.TicketContentMismatchException;
 import com.ventry.qrticket.exception.TicketNotFoundException;
@@ -13,17 +14,23 @@ import com.ventry.qrticket.kafka.TicketEventProducer;
 import com.ventry.qrticket.repository.TicketRepository;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+
 @Service
 public class TicketService {
 
+    private static final int QR_IMAGE_SIZE = 300;
+
     private final TicketRepository ticketRepository;
     private final TicketEventProducer ticketEventProducer;
+    private final QrCodeGenerator qrCodeGenerator;
     private final ObjectMapper objectMapper;
 
     public TicketService(TicketRepository ticketRepository, TicketEventProducer ticketEventProducer,
-                          ObjectMapper objectMapper) {
+                          QrCodeGenerator qrCodeGenerator, ObjectMapper objectMapper) {
         this.ticketRepository = ticketRepository;
         this.ticketEventProducer = ticketEventProducer;
+        this.qrCodeGenerator = qrCodeGenerator;
         this.objectMapper = objectMapper;
     }
 
@@ -80,6 +87,24 @@ public class TicketService {
             return objectMapper.readValue(qrContent, QrPayload.class);
         } catch (JsonProcessingException e) {
             throw new TicketContentMismatchException();
+        }
+    }
+
+    /**
+     * Regenerates the PNG on every call rather than reading stored bytes - qrContent fully
+     * determines the image, and generation is cheap, so there's nothing to gain from persisting
+     * a derivable artifact (see the plan's storage decision).
+     */
+    public byte[] getQrImage(String bookingId, String customerId) {
+        Ticket ticket = ticketRepository.findByBookingId(bookingId)
+                .orElseThrow(() -> new TicketNotFoundException(bookingId));
+        if (!ticket.getCustomerId().equals(customerId)) {
+            throw ForbiddenException.notTicketOwner(bookingId);
+        }
+        try {
+            return qrCodeGenerator.generate(ticket.getQrContent(), QR_IMAGE_SIZE);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to generate QR image for booking " + bookingId, e);
         }
     }
 }
