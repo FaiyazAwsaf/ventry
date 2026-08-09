@@ -50,12 +50,16 @@ Every pattern here earns its place rather than being added for keyword coverage:
                    │                  │
                    │                  ▼
                    │            ┌───────────────┐
-                   └───────────►│  Kafka topics  │◄────────────┐
-                                └───────────────┘              │
-                                        │                       │
-                                        ▼                       │
-                                Payment Service :8084 ──────────┘
-                                bKash/SSLCommerz mock gateways
+                   └───────────►│  Kafka topics  │◄────────────┬──────────────┐
+                                └───────────────┘              │              │
+                                        │                       │              │
+                                        ▼                       │              │
+                                Payment Service :8084 ──────────┘              │
+                                bKash/SSLCommerz mock gateways                 │
+                                                                                │
+                                QR/Ticket Service :8085 ───────────────────────┘
+                                consumes booking.confirmed, generates QR,
+                                publishes ticket.generated
 ```
 
 See [`docs/architecture.md`](docs/architecture.md) for the full system requirements doc,
@@ -71,7 +75,7 @@ Saga/CQRS/Event-Sourcing pattern writeups, and Kafka topic table.
 | `event-service` | 8082 | ✅ | Event/tier CRUD, Redis-cached browse, atomic inventory, analytics |
 | `booking-service` | 8083 | ✅ (write side) | Saga trigger, event-sourced booking state |
 | `payment-service` | 8084 | ✅ | Mocked bKash/SSLCommerz, Kafka-only (no REST surface) |
-| QR/Ticket Service | — | ❌ not started | QR generation + entry validation |
+| `qr-ticket-service` | 8085 | ✅ | QR generation, entry-gate scan validation, customer ticket fetch |
 | Notification Service | — | ❌ not started | Async email/SMS via Kafka |
 | User Service | — | ❌ optional | Stretch goal |
 
@@ -104,16 +108,26 @@ docker exec ventry-kafka /opt/kafka/bin/kafka-topics.sh --create --if-not-exists
 docker exec ventry-kafka /opt/kafka/bin/kafka-topics.sh --create --if-not-exists \
   --bootstrap-server localhost:9092 --topic ticket.generated
 
-# 3. Build and install the shared event-contracts module
+# 3. Create each service's Postgres schema (Hibernate's ddl-auto: update creates
+#    tables within a schema, but never the schema itself - a one-time step per
+#    service, same category as the Kafka topics above)
+docker exec ventry-postgres psql -U ventry -d ventry -c "CREATE SCHEMA IF NOT EXISTS auth;"
+docker exec ventry-postgres psql -U ventry -d ventry -c "CREATE SCHEMA IF NOT EXISTS event;"
+docker exec ventry-postgres psql -U ventry -d ventry -c "CREATE SCHEMA IF NOT EXISTS booking;"
+docker exec ventry-postgres psql -U ventry -d ventry -c "CREATE SCHEMA IF NOT EXISTS payment;"
+docker exec ventry-postgres psql -U ventry -d ventry -c "CREATE SCHEMA IF NOT EXISTS ticket;"
+
+# 4. Build and install the shared event-contracts module
 mvn -pl common -am install
 
-# 4. Start services, in order (each waits ~10s to register with Eureka before the next depends on it)
+# 5. Start services, in order (each waits ~10s to register with Eureka before the next depends on it)
 mvn -pl eureka-server spring-boot:run &
 mvn -pl api-gateway spring-boot:run &
 mvn -pl auth-service spring-boot:run &
 mvn -pl event-service spring-boot:run &
 mvn -pl booking-service spring-boot:run &
 mvn -pl payment-service spring-boot:run &
+mvn -pl qr-ticket-service spring-boot:run &
 ```
 
 Eureka dashboard: http://localhost:8761. All traffic goes through the Gateway at
@@ -139,7 +153,21 @@ curl -X POST localhost:8080/api/bookings -H "Authorization: Bearer $TOKEN" \
 ```
 
 Watch the services' logs: `booking.initiated` → Payment Service picks it up →
-`payment.success`/`payment.failed` → Booking Service confirms or releases inventory.
+`payment.success`/`payment.failed` → Booking Service confirms or releases inventory →
+QR/Ticket Service generates a ticket on `booking.confirmed`.
+
+```bash
+# Fetch the QR image for a confirmed booking - the Gateway derives X-User-Id from
+# $TOKEN itself (never client-supplied), so this only succeeds for the booking's
+# own customer
+curl localhost:8080/api/tickets/<booking-id>/qr -H "Authorization: Bearer $TOKEN" -o ticket.png
+
+# Validate a scanned ticket at the gate (ADMIN only) - qrContent is whatever a real
+# scanner reads back out of the QR image above
+curl -X POST localhost:8080/api/tickets/validate -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"qrContent":"<content encoded in the scanned QR>"}'
+```
 
 ## Testing
 
