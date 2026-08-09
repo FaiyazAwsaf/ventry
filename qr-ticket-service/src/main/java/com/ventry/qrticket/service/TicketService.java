@@ -6,6 +6,9 @@ import com.ventry.common.events.BookingConfirmedEvent;
 import com.ventry.common.events.TicketGeneratedEvent;
 import com.ventry.qrticket.dto.QrPayload;
 import com.ventry.qrticket.entity.Ticket;
+import com.ventry.qrticket.exception.TicketAlreadyValidatedException;
+import com.ventry.qrticket.exception.TicketContentMismatchException;
+import com.ventry.qrticket.exception.TicketNotFoundException;
 import com.ventry.qrticket.kafka.TicketEventProducer;
 import com.ventry.qrticket.repository.TicketRepository;
 import org.springframework.stereotype.Service;
@@ -49,6 +52,34 @@ public class TicketService {
                     new QrPayload(event.bookingId(), event.eventId(), event.tierId(), event.customerId()));
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to build QR content for booking " + event.bookingId(), e);
+        }
+    }
+
+    /**
+     * bookingId is taken from the parsed scanned content, not a path/request parameter - a real
+     * scan device only has whatever's encoded in the QR itself. The stored qrContent is then
+     * compared byte-for-byte against what was scanned, which is what actually defends against a
+     * forged payload that merely guesses a valid bookingId.
+     */
+    public Ticket validateTicket(String scannedQrContent) {
+        QrPayload payload = parseQrContent(scannedQrContent);
+        Ticket ticket = ticketRepository.findByBookingId(payload.bookingId())
+                .orElseThrow(() -> new TicketNotFoundException(payload.bookingId()));
+
+        if (!ticket.getQrContent().equals(scannedQrContent)) {
+            throw new TicketContentMismatchException();
+        }
+        if (!ticket.validate()) {
+            throw new TicketAlreadyValidatedException(payload.bookingId());
+        }
+        return ticketRepository.save(ticket);
+    }
+
+    private QrPayload parseQrContent(String qrContent) {
+        try {
+            return objectMapper.readValue(qrContent, QrPayload.class);
+        } catch (JsonProcessingException e) {
+            throw new TicketContentMismatchException();
         }
     }
 }
