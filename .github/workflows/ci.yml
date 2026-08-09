@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [production, development]
+  pull_request:
+    branches: [production, development]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    # No Kafka service container here on purpose: verified locally that every
+    # module's `mvn verify` passes with Kafka offline (listener containers just
+    # retry/log in the background; producer beans are @MockitoBean-mocked in the
+    # tests that need them). Revisit if a Testcontainers-based real-Kafka
+    # integration test is ever added.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ventry
+          POSTGRES_PASSWORD: ventry
+          POSTGRES_DB: ventry
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Create per-service Postgres schemas
+        run: |
+          for schema in auth event booking payment ticket; do
+            PGPASSWORD=ventry psql -h 127.0.0.1 -U ventry -d ventry -c "CREATE SCHEMA IF NOT EXISTS $schema;"
+          done
+
+      - name: Build and test (mvn verify)
+        run: mvn -B -ntp verify
