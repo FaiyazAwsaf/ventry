@@ -50,6 +50,18 @@
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
                     <version>${spring-boot.version}</version>
+                    <!-- Without this, `mvn package` produces a plain (non-executable) jar:
+                         this project doesn't inherit from spring-boot-starter-parent (which
+                         binds `repackage` for free), and every service's own pom.xml declares
+                         the plugin bare. Went unnoticed until now because local dev always used
+                         `spring-boot:run`, which never needs the repackaged jar. -->
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>repackage</goal>
+                            </goals>
+                        </execution>
+                    </executions>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
