@@ -117,6 +117,7 @@ docker exec ventry-postgres psql -U ventry -d ventry -c "CREATE SCHEMA IF NOT EX
 docker exec ventry-postgres psql -U ventry -d ventry -c "CREATE SCHEMA IF NOT EXISTS booking;"
 docker exec ventry-postgres psql -U ventry -d ventry -c "CREATE SCHEMA IF NOT EXISTS payment;"
 docker exec ventry-postgres psql -U ventry -d ventry -c "CREATE SCHEMA IF NOT EXISTS ticket;"
+docker exec ventry-postgres psql -U ventry -d ventry -c "CREATE SCHEMA IF NOT EXISTS notification;"
 
 # 4. Build and install the shared event-contracts module
 mvn -pl common -am install
