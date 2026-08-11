@@ -66,6 +66,11 @@ Every pattern here earns its place rather than being added for keyword coverage:
 See [`docs/architecture.md`](docs/architecture.md) for the full system requirements doc,
 Saga/CQRS/Event-Sourcing pattern writeups, and Kafka topic table.
 
+Not pictured above: `notification-service` (`:8086`) also consumes from the same Kafka topics
+(`payment.failed`, `booking.confirmed`, `booking.cancelled`, `refund.processed`,
+`ticket.generated`). It's a pure sink with no REST surface and nothing calls into it, so it
+doesn't fit cleanly into the request-flow diagram above.
+
 ## Services
 
 | Service | Port | Status | Responsibility |
@@ -77,8 +82,7 @@ Saga/CQRS/Event-Sourcing pattern writeups, and Kafka topic table.
 | `booking-service` | 8083 | ✅ (write side) | Saga trigger, event-sourced booking state |
 | `payment-service` | 8084 | ✅ | Mocked bKash/SSLCommerz, Kafka-only (no REST surface) |
 | `qr-ticket-service` | 8085 | ✅ | QR generation, entry-gate scan validation, customer ticket fetch |
-| Notification Service | — | ❌ not started | Async email/SMS via Kafka |
-| User Service | — | ❌ optional | Stretch goal |
+| `notification-service` | 8086 | ✅ | Mocked email/SMS (logged, not delivered) on every booking/payment/refund/ticket event, Kafka-only (no REST surface) |
 
 Full endpoint-by-endpoint contract (including what's implemented vs. still a gap) is in
 [`docs/api-contracts.md`](docs/api-contracts.md).
