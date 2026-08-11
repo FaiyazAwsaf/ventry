@@ -1,5 +1,6 @@
 package com.ventry.common.events;
 
 public record RefundProcessedEvent(
-        String bookingId
+        String bookingId,
+        String customerId
 ) {}

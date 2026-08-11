@@ -50,7 +50,7 @@ public class TicketService {
                 event.bookingId(), event.eventId(), event.tierId(), event.customerId(), event.quantity(), qrContent);
         ticketRepository.save(ticket);
 
-        ticketEventProducer.publishTicketGenerated(new TicketGeneratedEvent(event.bookingId()));
+        ticketEventProducer.publishTicketGenerated(new TicketGeneratedEvent(event.bookingId(), event.customerId()));
     }
 
     private String buildQrContent(BookingConfirmedEvent event) {

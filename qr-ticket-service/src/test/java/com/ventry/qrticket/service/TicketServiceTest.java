@@ -54,7 +54,7 @@ class TicketServiceTest {
                         && ticket.getQuantity() == 2
                         && ticket.getQrContent().contains("booking-1")
         ));
-        verify(ticketEventProducer).publishTicketGenerated(new TicketGeneratedEvent("booking-1"));
+        verify(ticketEventProducer).publishTicketGenerated(new TicketGeneratedEvent("booking-1", "customer-1"));
     }
 
     @Test

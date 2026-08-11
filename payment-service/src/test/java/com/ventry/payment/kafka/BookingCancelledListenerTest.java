@@ -38,7 +38,7 @@ class BookingCancelledListenerTest {
         listener.handleBookingCancelled(event);
 
         verify(kafkaTemplate).send(eq("refund.processed"), eq("booking-1"),
-                eq(new RefundProcessedEvent("booking-1")));
+                eq(new RefundProcessedEvent("booking-1", "customer-1")));
     }
 
     @Test

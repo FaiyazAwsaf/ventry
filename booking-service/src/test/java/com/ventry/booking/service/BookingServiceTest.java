@@ -156,7 +156,7 @@ class BookingServiceTest {
         String bookingId = booking.getBookingId();
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
 
-        PaymentFailedEvent event = new PaymentFailedEvent(bookingId, "Payment declined by BKASH");
+        PaymentFailedEvent event = new PaymentFailedEvent(bookingId, "customer-1", "Payment declined by BKASH");
         bookingService.failBooking(event);
 
         assertThat(booking.getStatus()).isEqualTo(Booking.Status.FAILED);
@@ -171,7 +171,7 @@ class BookingServiceTest {
         String bookingId = booking.getBookingId();
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
 
-        bookingService.failBooking(new PaymentFailedEvent(bookingId, "Payment declined by BKASH"));
+        bookingService.failBooking(new PaymentFailedEvent(bookingId, "customer-1", "Payment declined by BKASH"));
 
         verify(bookingEventStore, never()).append(any(), any(), any());
         verify(eventServiceClient, never()).releaseInventory(any(), any(), anyInt());
@@ -240,7 +240,7 @@ class BookingServiceTest {
         String bookingId = booking.getBookingId();
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
 
-        RefundProcessedEvent event = new RefundProcessedEvent(bookingId);
+        RefundProcessedEvent event = new RefundProcessedEvent(bookingId, "customer-1");
         bookingService.completeCancellation(event);
 
         assertThat(booking.getStatus()).isEqualTo(Booking.Status.CANCELLED);
@@ -257,7 +257,7 @@ class BookingServiceTest {
         String bookingId = booking.getBookingId();
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
 
-        bookingService.completeCancellation(new RefundProcessedEvent(bookingId));
+        bookingService.completeCancellation(new RefundProcessedEvent(bookingId, "customer-1"));
 
         verify(bookingEventStore, never()).append(any(), any(), any());
         verify(eventServiceClient, never()).releaseInventory(any(), any(), anyInt());
@@ -267,7 +267,7 @@ class BookingServiceTest {
     void completeCancellation_throwsWhenBookingUnknown() {
         when(bookingRepository.findById("missing-booking")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> bookingService.completeCancellation(new RefundProcessedEvent("missing-booking")))
+        assertThatThrownBy(() -> bookingService.completeCancellation(new RefundProcessedEvent("missing-booking", "customer-1")))
                 .isInstanceOf(BookingNotFoundException.class);
     }
 }

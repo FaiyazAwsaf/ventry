@@ -28,7 +28,8 @@ public class BookingCancelledListener {
     @KafkaListener(topics = "booking.cancelled")
     public void handleBookingCancelled(BookingCancelledEvent event) {
         if (paymentService.processRefund(event)) {
-            kafkaTemplate.send(REFUND_PROCESSED_TOPIC, event.bookingId(), new RefundProcessedEvent(event.bookingId()));
+            kafkaTemplate.send(REFUND_PROCESSED_TOPIC, event.bookingId(),
+                    new RefundProcessedEvent(event.bookingId(), event.customerId()));
         }
     }
 }

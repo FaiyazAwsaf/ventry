@@ -53,6 +53,6 @@ class BookingInitiatedListenerTest {
         listener.handleBookingInitiated(event);
 
         verify(kafkaTemplate).send(eq("payment.failed"), eq("booking-2"),
-                eq(new PaymentFailedEvent("booking-2", "Payment declined by SSLCOMMERZ")));
+                eq(new PaymentFailedEvent("booking-2", "customer-1", "Payment declined by SSLCOMMERZ")));
     }
 }

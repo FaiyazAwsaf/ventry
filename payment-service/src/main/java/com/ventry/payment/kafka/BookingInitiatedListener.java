@@ -40,7 +40,8 @@ public class BookingInitiatedListener {
                     new PaymentSuccessEvent(event.bookingId(), payment.getAmount()));
         } else {
             kafkaTemplate.send(PAYMENT_FAILED_TOPIC, event.bookingId(),
-                    new PaymentFailedEvent(event.bookingId(), "Payment declined by " + payment.getGatewayUsed()));
+                    new PaymentFailedEvent(event.bookingId(), event.customerId(),
+                            "Payment declined by " + payment.getGatewayUsed()));
         }
     }
 }
