@@ -2,6 +2,7 @@ package com.ventry.booking.client;
 
 import com.ventry.booking.client.dto.EventDetailsResponse;
 import com.ventry.booking.client.dto.InventoryAdjustmentRequest;
+import com.ventry.booking.client.dto.TierDetails;
 import com.ventry.booking.client.dto.TierView;
 import com.ventry.booking.exception.EventOrTierNotFoundException;
 import com.ventry.booking.exception.TierUnavailableException;
@@ -9,8 +10,6 @@ import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
-
-import java.math.BigDecimal;
 
 @Component
 public class EventServiceClient {
@@ -22,10 +21,13 @@ public class EventServiceClient {
     }
 
     /**
-     * The authoritative unit price for a tier - Booking Service computes totalAmount from
-     * this, never from a client-supplied amount, since the amount feeds directly into payment.
+     * The authoritative unit price for a tier, plus the event/tier display names - Booking
+     * Service computes totalAmount from the price, never from a client-supplied amount, since
+     * the amount feeds directly into payment. The names ride along on this same call so the
+     * CQRS read model (see docs/progress.md's Read-Side & Resilience milestone) can denormalize
+     * them without a second Event Service round trip.
      */
-    public BigDecimal getTierPrice(String eventId, String tierId) {
+    public TierDetails getTierDetails(String eventId, String tierId) {
         EventDetailsResponse event;
         try {
             event = restClient.get()
@@ -36,11 +38,12 @@ public class EventServiceClient {
             throw new EventOrTierNotFoundException(eventId, tierId);
         }
 
-        return event.tiers().stream()
-                .filter(tier -> tier.id().equals(tierId))
-                .map(TierView::price)
+        TierView tier = event.tiers().stream()
+                .filter(t -> t.id().equals(tierId))
                 .findFirst()
                 .orElseThrow(() -> new EventOrTierNotFoundException(eventId, tierId));
+
+        return new TierDetails(tier.price(), event.name(), tier.name());
     }
 
     /**

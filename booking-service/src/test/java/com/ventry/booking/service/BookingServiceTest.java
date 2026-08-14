@@ -1,6 +1,7 @@
 package com.ventry.booking.service;
 
 import com.ventry.booking.client.EventServiceClient;
+import com.ventry.booking.client.dto.TierDetails;
 import com.ventry.booking.dto.BookingResponse;
 import com.ventry.booking.dto.CreateBookingRequest;
 import com.ventry.booking.entity.Booking;
@@ -58,7 +59,8 @@ class BookingServiceTest {
     @Test
     void createBooking_reservesInventoryPersistsAndPublishesOnSuccess() {
         CreateBookingRequest request = new CreateBookingRequest("event-1", "tier-1", 2);
-        when(eventServiceClient.getTierPrice("event-1", "tier-1")).thenReturn(BigDecimal.valueOf(500));
+        when(eventServiceClient.getTierDetails("event-1", "tier-1"))
+                .thenReturn(new TierDetails(BigDecimal.valueOf(500), "Concert Night", "Gold"));
 
         BookingResponse response = bookingService.createBooking("customer-1", request);
 
@@ -85,7 +87,7 @@ class BookingServiceTest {
     @Test
     void createBooking_propagatesNotFoundWithoutReservingOrPersisting() {
         CreateBookingRequest request = new CreateBookingRequest("event-1", "missing-tier", 1);
-        when(eventServiceClient.getTierPrice("event-1", "missing-tier"))
+        when(eventServiceClient.getTierDetails("event-1", "missing-tier"))
                 .thenThrow(new EventOrTierNotFoundException("event-1", "missing-tier"));
 
         assertThatThrownBy(() -> bookingService.createBooking("customer-1", request))
@@ -99,7 +101,8 @@ class BookingServiceTest {
     @Test
     void createBooking_propagatesConflictWithoutPersistingWhenReservationFails() {
         CreateBookingRequest request = new CreateBookingRequest("event-1", "tier-1", 5);
-        when(eventServiceClient.getTierPrice("event-1", "tier-1")).thenReturn(BigDecimal.valueOf(200));
+        when(eventServiceClient.getTierDetails("event-1", "tier-1"))
+                .thenReturn(new TierDetails(BigDecimal.valueOf(200), "Concert Night", "Gold"));
         doThrow(new TierUnavailableException("event-1", "tier-1", 5))
                 .when(eventServiceClient).reserveInventory("event-1", "tier-1", 5);
 

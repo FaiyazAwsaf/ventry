@@ -2,6 +2,7 @@ package com.ventry.booking.controller;
 
 import com.jayway.jsonpath.JsonPath;
 import com.ventry.booking.client.EventServiceClient;
+import com.ventry.booking.client.dto.TierDetails;
 import com.ventry.booking.entity.Booking;
 import com.ventry.booking.exception.EventOrTierNotFoundException;
 import com.ventry.booking.exception.TierUnavailableException;
@@ -54,7 +55,8 @@ class BookingControllerIT {
 
     @Test
     void createBooking_persistsEventLogAndPublishesOnSuccess() throws Exception {
-        when(eventServiceClient.getTierPrice("event-1", "tier-1")).thenReturn(BigDecimal.valueOf(500));
+        when(eventServiceClient.getTierDetails("event-1", "tier-1"))
+                .thenReturn(new TierDetails(BigDecimal.valueOf(500), "Concert Night", "Gold"));
 
         String requestJson = """
                 {"eventId":"event-1","tierId":"tier-1","quantity":2}
@@ -82,7 +84,7 @@ class BookingControllerIT {
 
     @Test
     void createBooking_returns404WhenEventOrTierMissing() throws Exception {
-        when(eventServiceClient.getTierPrice("missing-event", "tier-1"))
+        when(eventServiceClient.getTierDetails("missing-event", "tier-1"))
                 .thenThrow(new EventOrTierNotFoundException("missing-event", "tier-1"));
 
         String requestJson = """
@@ -98,7 +100,8 @@ class BookingControllerIT {
 
     @Test
     void createBooking_returns409WhenTierUnavailable() throws Exception {
-        when(eventServiceClient.getTierPrice("event-1", "tier-1")).thenReturn(BigDecimal.valueOf(500));
+        when(eventServiceClient.getTierDetails("event-1", "tier-1"))
+                .thenReturn(new TierDetails(BigDecimal.valueOf(500), "Concert Night", "Gold"));
         doThrow(new TierUnavailableException("event-1", "tier-1", 10))
                 .when(eventServiceClient).reserveInventory("event-1", "tier-1", 10);
 

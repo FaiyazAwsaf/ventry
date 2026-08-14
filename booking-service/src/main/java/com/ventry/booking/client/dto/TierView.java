@@ -5,5 +5,5 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.math.BigDecimal;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record TierView(String id, BigDecimal price) {
+public record TierView(String id, String name, BigDecimal price) {
 }

@@ -1,6 +1,7 @@
 package com.ventry.booking.service;
 
 import com.ventry.booking.client.EventServiceClient;
+import com.ventry.booking.client.dto.TierDetails;
 import com.ventry.booking.dto.BookingResponse;
 import com.ventry.booking.dto.CreateBookingRequest;
 import com.ventry.booking.entity.Booking;
@@ -49,8 +50,8 @@ public class BookingService {
      * booking never enters the saga at all, so there's nothing to compensate.
      */
     public BookingResponse createBooking(String customerId, CreateBookingRequest request) {
-        BigDecimal unitPrice = eventServiceClient.getTierPrice(request.eventId(), request.tierId());
-        BigDecimal totalAmount = unitPrice.multiply(BigDecimal.valueOf(request.quantity()));
+        TierDetails tierDetails = eventServiceClient.getTierDetails(request.eventId(), request.tierId());
+        BigDecimal totalAmount = tierDetails.price().multiply(BigDecimal.valueOf(request.quantity()));
 
         eventServiceClient.reserveInventory(request.eventId(), request.tierId(), request.quantity());
 
