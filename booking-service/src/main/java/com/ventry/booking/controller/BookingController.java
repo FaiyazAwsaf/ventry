@@ -1,9 +1,11 @@
 package com.ventry.booking.controller;
 
+import com.ventry.booking.dto.BookingReplayResponse;
 import com.ventry.booking.dto.BookingResponse;
 import com.ventry.booking.dto.BookingViewResponse;
 import com.ventry.booking.dto.CreateBookingRequest;
 import com.ventry.booking.service.BookingQueryService;
+import com.ventry.booking.service.BookingReplayService;
 import com.ventry.booking.service.BookingService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -24,10 +26,13 @@ public class BookingController {
 
     private final BookingService bookingService;
     private final BookingQueryService bookingQueryService;
+    private final BookingReplayService bookingReplayService;
 
-    public BookingController(BookingService bookingService, BookingQueryService bookingQueryService) {
+    public BookingController(BookingService bookingService, BookingQueryService bookingQueryService,
+                              BookingReplayService bookingReplayService) {
         this.bookingService = bookingService;
         this.bookingQueryService = bookingQueryService;
+        this.bookingReplayService = bookingReplayService;
     }
 
     /**
@@ -78,5 +83,19 @@ public class BookingController {
             @PathVariable String bookingId
     ) {
         return bookingQueryService.getBooking(bookingId, customerId);
+    }
+
+    /**
+     * Event Sourcing, demonstrated: rebuilds this booking's state purely by replaying
+     * booking_event_store, independently of BookingView - proves the event log alone is
+     * sufficient to answer "what state is this booking in", not just that two systems fed by
+     * the same writes happen to agree. Same X-User-Id ownership model as getBooking.
+     */
+    @GetMapping("/{bookingId}/replay")
+    public BookingReplayResponse replayBooking(
+            @RequestHeader("X-User-Id") String customerId,
+            @PathVariable String bookingId
+    ) {
+        return bookingReplayService.replay(bookingId, customerId);
     }
 }
