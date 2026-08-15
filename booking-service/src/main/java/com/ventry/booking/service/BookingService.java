@@ -63,7 +63,7 @@ public class BookingService {
                 request.quantity(), totalAmount
         );
 
-        bookingEventStore.append(booking, BOOKING_INITIATED, event);
+        bookingEventStore.append(booking, BOOKING_INITIATED, event, tierDetails.eventName(), tierDetails.tierName());
         bookingEventProducer.publishBookingInitiated(event);
 
         return toResponse(booking);

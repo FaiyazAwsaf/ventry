@@ -75,7 +75,8 @@ class BookingServiceTest {
 
         ArgumentCaptor<Booking> bookingCaptor = ArgumentCaptor.forClass(Booking.class);
         ArgumentCaptor<BookingInitiatedEvent> eventCaptor = ArgumentCaptor.forClass(BookingInitiatedEvent.class);
-        verify(bookingEventStore).append(bookingCaptor.capture(), eq("BOOKING_INITIATED"), eventCaptor.capture());
+        verify(bookingEventStore).append(bookingCaptor.capture(), eq("BOOKING_INITIATED"), eventCaptor.capture(),
+                eq("Concert Night"), eq("Gold"));
 
         assertThat(bookingCaptor.getValue().getCustomerId()).isEqualTo("customer-1");
         assertThat(eventCaptor.getValue().bookingId()).isEqualTo(bookingCaptor.getValue().getBookingId());
@@ -94,7 +95,7 @@ class BookingServiceTest {
                 .isInstanceOf(EventOrTierNotFoundException.class);
 
         verify(eventServiceClient, never()).reserveInventory(any(), any(), anyInt());
-        verify(bookingEventStore, never()).append(any(), any(), any());
+        verify(bookingEventStore, never()).append(any(), any(), any(), any(), any());
         verify(bookingEventProducer, never()).publishBookingInitiated(any());
     }
 
@@ -109,7 +110,7 @@ class BookingServiceTest {
         assertThatThrownBy(() -> bookingService.createBooking("customer-1", request))
                 .isInstanceOf(TierUnavailableException.class);
 
-        verify(bookingEventStore, never()).append(any(), any(), any());
+        verify(bookingEventStore, never()).append(any(), any(), any(), any(), any());
         verify(bookingEventProducer, never()).publishBookingInitiated(any());
     }
 
