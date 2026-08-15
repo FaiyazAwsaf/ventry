@@ -317,4 +317,55 @@ class BookingControllerIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
     }
+
+    /**
+     * The concrete Event Sourcing demo: after a full lifecycle, GET /{id} (BookingView, the
+     * fast CQRS read model) and GET /{id}/replay (rebuilt from scratch by folding over
+     * booking_event_store) must independently agree on the same final state.
+     */
+    @Test
+    void replayEndpoint_reconstructsSameStateAsReadModelAfterFullLifecycle() throws Exception {
+        String bookingId = createBooking("customer-1", "event-1", "tier-1", 2,
+                BigDecimal.valueOf(500), "Concert Night", "Gold");
+
+        bookingService.confirmBooking(new PaymentSuccessEvent(bookingId, BigDecimal.valueOf(1000)));
+
+        mockMvc.perform(post("/api/bookings/{bookingId}/cancel", bookingId)
+                        .header("X-User-Id", "customer-1"))
+                .andExpect(status().isOk());
+
+        bookingService.completeCancellation(new RefundProcessedEvent(bookingId, "customer-1"));
+
+        mockMvc.perform(get("/api/bookings/{bookingId}", bookingId)
+                        .header("X-User-Id", "customer-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+
+        mockMvc.perform(get("/api/bookings/{bookingId}/replay", bookingId)
+                        .header("X-User-Id", "customer-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.customerId").value("customer-1"))
+                .andExpect(jsonPath("$.eventId").value("event-1"))
+                .andExpect(jsonPath("$.tierId").value("tier-1"))
+                .andExpect(jsonPath("$.quantity").value(2))
+                .andExpect(jsonPath("$.eventsReplayed").value(4));
+    }
+
+    @Test
+    void replayBooking_rejectsNonOwnerWith403() throws Exception {
+        String bookingId = createBooking("customer-1", "event-1", "tier-1", 1,
+                BigDecimal.valueOf(500), "Concert Night", "Gold");
+
+        mockMvc.perform(get("/api/bookings/{bookingId}/replay", bookingId)
+                        .header("X-User-Id", "someone-else"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void replayBooking_returns404ForUnknownBooking() throws Exception {
+        mockMvc.perform(get("/api/bookings/{bookingId}/replay", "does-not-exist")
+                        .header("X-User-Id", "customer-1"))
+                .andExpect(status().isNotFound());
+    }
 }
