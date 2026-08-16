@@ -44,7 +44,7 @@ public class Ticket {
 
     private Instant validatedAt;
 
-    public enum Status { GENERATED, VALIDATED }
+    public enum Status { GENERATED, VALIDATED, REVOKED }
 
     protected Ticket() {
     }
@@ -74,6 +74,20 @@ public class Ticket {
         }
         status = Status.VALIDATED;
         validatedAt = Instant.now();
+        return true;
+    }
+
+    /**
+     * Idempotent on booking.cancelled redelivery, same reasoning as validate()'s guard - a
+     * ticket already REVOKED shouldn't re-trigger downstream work. Revokes from any prior
+     * status (including VALIDATED): a booking can still be cancelled after its ticket was
+     * scanned, and the ticket should stop being presentable as valid either way.
+     */
+    public boolean revoke() {
+        if (status == Status.REVOKED) {
+            return false;
+        }
+        status = Status.REVOKED;
         return true;
     }
 

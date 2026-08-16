@@ -2,6 +2,7 @@ package com.ventry.qrticket.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ventry.common.events.BookingCancelledEvent;
 import com.ventry.common.events.BookingConfirmedEvent;
 import com.ventry.common.events.TicketGeneratedEvent;
 import com.ventry.qrticket.dto.QrPayload;
@@ -10,6 +11,7 @@ import com.ventry.qrticket.exception.ForbiddenException;
 import com.ventry.qrticket.exception.TicketAlreadyValidatedException;
 import com.ventry.qrticket.exception.TicketContentMismatchException;
 import com.ventry.qrticket.exception.TicketNotFoundException;
+import com.ventry.qrticket.exception.TicketRevokedException;
 import com.ventry.qrticket.kafka.TicketEventProducer;
 import com.ventry.qrticket.repository.TicketRepository;
 import org.springframework.stereotype.Service;
@@ -53,6 +55,20 @@ public class TicketService {
         ticketEventProducer.publishTicketGenerated(new TicketGeneratedEvent(event.bookingId(), event.customerId()));
     }
 
+    /**
+     * Consumes booking.cancelled - without this, a cancelled/refunded booking's QR stayed
+     * fully scannable forever, since validateTicket()/getQrImage() only ever checked the
+     * ticket's own GENERATED/VALIDATED state, never the booking's current status. Silent
+     * no-op if no ticket exists yet: booking.cancelled and booking.confirmed are on separate
+     * topics with no cross-topic ordering guarantee, so a cancellation could in principle be
+     * consumed before the confirmation that generates the ticket.
+     */
+    public void revokeTicket(BookingCancelledEvent event) {
+        ticketRepository.findByBookingId(event.bookingId())
+                .filter(Ticket::revoke)
+                .ifPresent(ticketRepository::save);
+    }
+
     private String buildQrContent(BookingConfirmedEvent event) {
         try {
             return objectMapper.writeValueAsString(
@@ -75,6 +91,9 @@ public class TicketService {
 
         if (!ticket.getQrContent().equals(scannedQrContent)) {
             throw new TicketContentMismatchException();
+        }
+        if (ticket.getStatus() == Ticket.Status.REVOKED) {
+            throw new TicketRevokedException(payload.bookingId());
         }
         if (!ticket.validate()) {
             throw new TicketAlreadyValidatedException(payload.bookingId());
@@ -100,6 +119,9 @@ public class TicketService {
                 .orElseThrow(() -> new TicketNotFoundException(bookingId));
         if (!ticket.getCustomerId().equals(customerId)) {
             throw ForbiddenException.notTicketOwner(bookingId);
+        }
+        if (ticket.getStatus() == Ticket.Status.REVOKED) {
+            throw new TicketRevokedException(bookingId);
         }
         try {
             return qrCodeGenerator.generate(ticket.getQrContent(), QR_IMAGE_SIZE);
