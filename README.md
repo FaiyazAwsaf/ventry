@@ -21,13 +21,20 @@ Every pattern here earns its place rather than being added for keyword coverage:
 - **Saga (choreography)** — booking → payment → confirmation is a distributed transaction
   across Booking, Payment, and Event Service. No 2PC, no orchestrator; each service reacts to
   Kafka events and knows how to compensate (release inventory) on failure.
-- **Event Sourcing** — Booking Service never overwrites state; it appends every transition
-  (`BOOKING_INITIATED`, `PAYMENT_SUCCESS`, `BOOKING_CONFIRMED`, ...) to an append-only store.
-  Current state is a replay, not a row.
+- **Event Sourcing** — every transition a booking goes through (`BOOKING_INITIATED`,
+  `BOOKING_CONFIRMED`, `BOOKING_FAILED`, `BOOKING_CANCELLATION_REQUESTED`, `BOOKING_CANCELLED`)
+  is appended to an event-store table, and `GET /bookings/{id}/replay` proves current state is
+  genuinely *derivable by replaying that log* — not just a row read off a table that happens to
+  sit next to it.
+- **CQRS** — Booking Service's write side (`POST /bookings`) and read side
+  (`GET /bookings/{id}`, `GET /bookings/history`) are separate code paths over separate tables:
+  a denormalized `BookingView` read model, kept in sync with every write-side transition inside
+  the same transaction — a read immediately after a write is always current, never eventually
+  consistent.
 - **Atomic inventory control under concurrency** — ticket reservation is a single conditional
   `UPDATE ... WHERE available >= quantity`, proven race-free under real concurrent load (20
   threads, capacity 10 → exactly 10 succeed, zero oversell — see `TicketTierInventoryIT`).
-- **CQRS, Circuit Breaker** — architecturally scoped now, built next (see
+- **Circuit Breaker** — architecturally scoped to Booking → Event Service calls, built next (see
   [`docs/progress.md`](docs/progress.md) for current status).
 
 
@@ -79,7 +86,7 @@ doesn't fit cleanly into the request-flow diagram above.
 | `api-gateway` | 8080 | ✅ | Single entry point, JWT verification, identity forwarding |
 | `auth-service` | 8081 | ✅ | Register/login, BCrypt, JWT issuance |
 | `event-service` | 8082 | ✅ | Event/tier CRUD, Redis-cached browse, atomic inventory, analytics |
-| `booking-service` | 8083 | ✅ (write side) | Saga trigger, event-sourced booking state |
+| `booking-service` | 8083 | ✅ | Saga trigger, event-sourced booking state, CQRS read side, event-log replay |
 | `payment-service` | 8084 | ✅ | Mocked bKash/SSLCommerz, Kafka-only (no REST surface) |
 | `qr-ticket-service` | 8085 | ✅ | QR generation, entry-gate scan validation, customer ticket fetch |
 | `notification-service` | 8086 | ✅ | Mocked email/SMS (logged, not delivered) on every booking/payment/refund/ticket event, Kafka-only (no REST surface) |
@@ -134,6 +141,7 @@ mvn -pl event-service spring-boot:run &
 mvn -pl booking-service spring-boot:run &
 mvn -pl payment-service spring-boot:run &
 mvn -pl qr-ticket-service spring-boot:run &
+mvn -pl notification-service spring-boot:run &
 ```
 
 Eureka dashboard: http://localhost:8761. All traffic goes through the Gateway at
@@ -161,6 +169,19 @@ curl -X POST localhost:8080/api/bookings -H "Authorization: Bearer $TOKEN" \
 Watch the services' logs: `booking.initiated` → Payment Service picks it up →
 `payment.success`/`payment.failed` → Booking Service confirms or releases inventory →
 QR/Ticket Service generates a ticket on `booking.confirmed`.
+
+```bash
+# CQRS read side: reads the denormalized BookingView, kept in sync with every write-side
+# transition inside the same transaction - reflects CONFIRMED immediately, not eventually
+curl localhost:8080/api/bookings/<booking-id> -H "Authorization: Bearer $TOKEN"
+
+# Everything this customer has ever booked, most recently updated first
+curl localhost:8080/api/bookings/history -H "Authorization: Bearer $TOKEN"
+
+# Event Sourcing, demonstrated: rebuilds the same booking's state from scratch by folding
+# over its raw event_store history - independent of BookingView above, same answer either way
+curl localhost:8080/api/bookings/<booking-id>/replay -H "Authorization: Bearer $TOKEN"
+```
 
 ```bash
 # Fetch the QR image for a confirmed booking - the Gateway derives X-User-Id from
