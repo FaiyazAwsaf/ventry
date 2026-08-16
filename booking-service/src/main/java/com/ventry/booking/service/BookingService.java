@@ -96,16 +96,23 @@ public class BookingService {
      * No further Kafka publish here: payment.failed itself already reaches Notification
      * Service directly (see architecture.md's Kafka topic table), so Booking Service
      * doesn't need to republish anything for the failure branch.
+     *
+     * releaseInventory runs BEFORE the status transition is persisted: if it throws, the
+     * booking stays PENDING so Kafka's redelivery of payment.failed retries the whole
+     * compensation - not just skips it, which is what happens if the DB commit lands first
+     * and a later retry finds the booking already terminal.
      */
     public void failBooking(PaymentFailedEvent event) {
         Booking booking = findBookingOrThrow(event.bookingId());
 
-        if (!booking.markFailed()) {
+        if (booking.getStatus() != Booking.Status.PENDING) {
             return;
         }
 
-        bookingEventStore.append(booking, BOOKING_FAILED, event);
         eventServiceClient.releaseInventory(booking.getEventId(), booking.getTierId(), booking.getQuantity());
+
+        booking.markFailed();
+        bookingEventStore.append(booking, BOOKING_FAILED, event);
     }
 
     /**
@@ -138,16 +145,23 @@ public class BookingService {
      * redelivery. No further Kafka publish here: refund.processed itself already reaches
      * Notification Service directly (architecture.md §5.3), so there's no
      * cancellation.confirmed to republish.
+     *
+     * releaseInventory runs BEFORE the status transition is persisted, same reasoning as
+     * failBooking: if it throws, the booking stays CANCELLATION_PENDING so Kafka's
+     * redelivery of refund.processed retries the release instead of finding the booking
+     * already CANCELLED and silently skipping it.
      */
     public void completeCancellation(RefundProcessedEvent event) {
         Booking booking = findBookingOrThrow(event.bookingId());
 
-        if (!booking.completeCancellation()) {
+        if (booking.getStatus() != Booking.Status.CANCELLATION_PENDING) {
             return;
         }
 
-        bookingEventStore.append(booking, BOOKING_CANCELLED, event);
         eventServiceClient.releaseInventory(booking.getEventId(), booking.getTierId(), booking.getQuantity());
+
+        booking.completeCancellation();
+        bookingEventStore.append(booking, BOOKING_CANCELLED, event);
     }
 
     private Booking findBookingOrThrow(String bookingId) {
